@@ -22,7 +22,7 @@ import DictionaryDetailPage from './pages/DictionaryDetailPage';
 import AboutPage from './pages/AboutPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import { getSupabaseEnvErrorMessage, hasSupabaseEnv, supabase } from './lib/supabase';
+import { isUsingSupabaseFallback, supabase } from './lib/supabase';
 
 interface RouteState {
   page: string;
@@ -36,11 +36,6 @@ function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    if (!hasSupabaseEnv) {
-      setIsCheckingAuth(false);
-      return;
-    }
-
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -111,32 +106,11 @@ function App() {
   };
 
   const handleAdminLogout = async () => {
-    if (hasSupabaseEnv) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     setIsAdminLoggedIn(false);
     localStorage.removeItem('adminLoggedIn');
     setRoute({ page: 'home' });
   };
-
-  if (!hasSupabaseEnv) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-        <div className="w-full max-w-2xl rounded-2xl border border-amber-500/30 bg-slate-900 p-8 text-white shadow-2xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
-            Configuration Required
-          </p>
-          <h1 className="mb-4 text-3xl font-bold">The app is missing Supabase environment variables.</h1>
-          <p className="mb-4 text-slate-300">
-            Add the required `VITE_` variables in your Netlify environment settings and redeploy.
-          </p>
-          <pre className="overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm text-amber-200">
-            {getSupabaseEnvErrorMessage()}
-          </pre>
-        </div>
-      </div>
-    );
-  }
 
   const renderPage = () => {
     if (isCheckingAuth) {
@@ -259,6 +233,11 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 transition-colors">
+      {isUsingSupabaseFallback && (
+        <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
+          Supabase env vars are missing or invalid. Using fallback client configuration.
+        </div>
+      )}
       <Header currentPage={route.page} onNavigate={handleNavigate} onSearch={handleSearch} />
       <AdSlot placement="header" pageScope="global" />
       <main className="flex-1">{renderPage()}</main>
