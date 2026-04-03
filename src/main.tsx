@@ -4,7 +4,13 @@ import { HelmetProvider } from 'react-helmet-async';
 import App from './App.tsx';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error('React mount element "#root" was not found in index.html.');
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <HelmetProvider>
       <App />

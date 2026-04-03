@@ -2,12 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookMarked } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import { api, Collection, Shayari } from '../services/api';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from '../lib/supabase';
 
 interface CollectionDetailPageProps {
   collectionId: string;

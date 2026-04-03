@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import { AdSlot } from './components/ads/AdSlot';
@@ -23,15 +22,7 @@ import DictionaryDetailPage from './pages/DictionaryDetailPage';
 import AboutPage from './pages/AboutPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { getSupabaseEnvErrorMessage, hasSupabaseEnv, supabase } from './lib/supabase';
 
 interface RouteState {
   page: string;
@@ -45,16 +36,28 @@ function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
+    if (!hasSupabaseEnv) {
+      setIsCheckingAuth(false);
+      return;
+    }
+
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsAdminLoggedIn(true);
-        localStorage.setItem('adminLoggedIn', 'true');
-      } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setIsAdminLoggedIn(true);
+          localStorage.setItem('adminLoggedIn', 'true');
+        } else {
+          setIsAdminLoggedIn(false);
+          localStorage.removeItem('adminLoggedIn');
+        }
+      } catch (error) {
+        console.error('Error checking Supabase session:', error);
         setIsAdminLoggedIn(false);
         localStorage.removeItem('adminLoggedIn');
+      } finally {
+        setIsCheckingAuth(false);
       }
-      setIsCheckingAuth(false);
     };
 
     checkSession();
@@ -108,11 +111,32 @@ function App() {
   };
 
   const handleAdminLogout = async () => {
-    await supabase.auth.signOut();
+    if (hasSupabaseEnv) {
+      await supabase.auth.signOut();
+    }
     setIsAdminLoggedIn(false);
     localStorage.removeItem('adminLoggedIn');
     setRoute({ page: 'home' });
   };
+
+  if (!hasSupabaseEnv) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+        <div className="w-full max-w-2xl rounded-2xl border border-amber-500/30 bg-slate-900 p-8 text-white shadow-2xl">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+            Configuration Required
+          </p>
+          <h1 className="mb-4 text-3xl font-bold">The app is missing Supabase environment variables.</h1>
+          <p className="mb-4 text-slate-300">
+            Add the required `VITE_` variables in your Netlify environment settings and redeploy.
+          </p>
+          <pre className="overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm text-amber-200">
+            {getSupabaseEnvErrorMessage()}
+          </pre>
+        </div>
+      </div>
+    );
+  }
 
   const renderPage = () => {
     if (isCheckingAuth) {

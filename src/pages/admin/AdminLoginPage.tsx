@@ -1,15 +1,6 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { getSupabaseEnvErrorMessage, hasSupabaseEnv, supabase } from '../../lib/supabase';
 
 interface AdminLoginPageProps {
   onLogin: () => void;
@@ -24,6 +15,12 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!hasSupabaseEnv) {
+      setError(getSupabaseEnvErrorMessage());
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -66,6 +63,11 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!hasSupabaseEnv && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+              {getSupabaseEnvErrorMessage()}
+            </div>
+          )}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email

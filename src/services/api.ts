@@ -8,24 +8,8 @@
  * Node.js REST API endpoints instead of direct database access. UI components will
  * remain unchanged as they depend only on this service interface.
  */
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const dataSource = import.meta.env.VITE_DATA_SOURCE || 'bolt';
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
+import { supabase } from '../lib/supabase';
+export { supabase };
 
 export interface Poet {
   id: string;

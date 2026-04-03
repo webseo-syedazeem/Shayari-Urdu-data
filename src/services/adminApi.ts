@@ -8,18 +8,7 @@
  * Node.js REST API endpoints instead of direct database access. Admin UI components
  * will remain unchanged as they depend only on this service interface.
  */
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const dataSource = import.meta.env.VITE_DATA_SOURCE || 'bolt';
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../lib/supabase';
 
 function generateSlug(name: string): string {
   return name

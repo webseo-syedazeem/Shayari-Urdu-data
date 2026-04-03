@@ -5,17 +5,7 @@
  * Validates file types and sizes before upload.
  * Organizes files in structured folders by entity type.
  */
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../lib/supabase';
 
 const BUCKET_NAME = 'media';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -90,7 +80,7 @@ export async function uploadImage(
     const fileName = `${entityType === 'poets' ? 'avatar' : entityType === 'shayari' ? 'featured' : 'cover'}-${timestamp}.${ext}`;
     const filePath = `${entityType}/${entityId}/${fileName}`;
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filePath, file, {
         cacheControl: '3600',
