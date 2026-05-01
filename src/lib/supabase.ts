@@ -1,32 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
-
-export const hasSupabaseEnv =
-  !!supabaseUrl &&
-  supabaseUrl.startsWith('http') &&
-  !!supabaseAnonKey;
-
-export const isUsingSupabaseFallback = !hasSupabaseEnv;
-
-export function getSupabaseEnvErrorMessage() {
-  const issues: string[] = [];
-
-  if (!supabaseUrl) {
-    issues.push('VITE_SUPABASE_URL is missing');
-  } else if (!supabaseUrl.startsWith('http')) {
-    issues.push('VITE_SUPABASE_URL is invalid');
-  }
-
-  if (!supabaseAnonKey) {
-    issues.push('VITE_SUPABASE_ANON_KEY is missing');
-  }
-
-  return issues.join(', ');
-}
-
-export const supabase = createClient(
-  supabaseUrl!,
-  supabaseAnonKey!
-);
+// These exports are kept so existing imports don't break
+export const hasSupabaseEnv = true;
+export const isUsingSupabaseFallback = false;
+export function getSupabaseEnvErrorMessage() { return ''; }

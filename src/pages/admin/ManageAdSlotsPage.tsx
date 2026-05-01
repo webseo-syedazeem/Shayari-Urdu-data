@@ -52,7 +52,7 @@ export default function ManageAdSlotsPage() {
     try {
       setLoading(true);
       const data = await adminApi.get('/ad-slots');
-      setAdSlots(data.data);
+      setAdSlots(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading ad slots:', error);
       setError('Failed to load ad slots');

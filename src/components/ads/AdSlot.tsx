@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../services/api';
+
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
 interface AdSlotProps {
   placement: string;
@@ -24,29 +25,14 @@ const CACHE_DURATION = 5 * 60 * 1000;
 
 async function fetchAdSlot(placement: string, pageScope: string): Promise<AdSlotData | null> {
   const cacheKey = `${placement}:${pageScope}`;
-
   const cached = adSlotCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
-  }
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) return cached.data;
 
   try {
-    const { data, error } = await supabase
-      .from('ad_slots')
-      .select('*')
-      .eq('is_active', true)
-      .eq('placement', placement)
-      .or(`page_scope.eq.${pageScope},page_scope.eq.global`)
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching ad slot:', error);
-      return null;
-    }
-
+    const qs = new URLSearchParams({ activeOnly: 'true', placement, pageScope }).toString();
+    const res = await fetch(`${BASE_URL}/api/ad-slots?${qs}`);
+    if (!res.ok) return null;
+    const data = await res.json();
     adSlotCache.set(cacheKey, { data, timestamp: Date.now() });
     return data;
   } catch (error) {
@@ -66,7 +52,6 @@ export function AdSlot({ placement, pageScope, index }: AdSlotProps) {
       setAdSlot(slot);
       setLoading(false);
     }
-
     loadAdSlot();
   }, [placement, pageScope]);
 
@@ -82,31 +67,17 @@ export function AdSlot({ placement, pageScope, index }: AdSlotProps) {
     }
   }, [adSlot]);
 
-  if (loading) {
-    return null;
-  }
-
-  if (!adSlot || !adSlot.html_snippet || adSlot.html_snippet.trim() === '') {
-    return null;
-  }
+  if (loading) return null;
+  if (!adSlot || !adSlot.html_snippet || adSlot.html_snippet.trim() === '') return null;
 
   if (placement === 'between_shayari_cards' && typeof index === 'number') {
     const frequency = adSlot.frequency || 6;
-    if ((index + 1) % frequency !== 0) {
-      return null;
-    }
+    if ((index + 1) % frequency !== 0) return null;
   }
 
   return (
-    <div
-      className="ad-slot-container my-4"
-      data-ad-key={adSlot.key}
-      data-ad-placement={placement}
-    >
-      <div
-        className="ad-slot-content"
-        dangerouslySetInnerHTML={{ __html: adSlot.html_snippet }}
-      />
+    <div className="ad-slot-container my-4" data-ad-key={adSlot.key} data-ad-placement={placement}>
+      <div className="ad-slot-content" dangerouslySetInnerHTML={{ __html: adSlot.html_snippet }} />
     </div>
   );
 }

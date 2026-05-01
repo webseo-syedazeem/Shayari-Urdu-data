@@ -1,14 +1,6 @@
-/*
- * UPLOAD SERVICE
- *
- * Handles file uploads to Supabase Storage.
- * Validates file types and sizes before upload.
- * Organizes files in structured folders by entity type.
- */
-import { supabase } from '../lib/supabase';
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
-const BUCKET_NAME = 'media';
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 export type EntityType = 'poets' | 'shayari' | 'ebooks' | 'collections';
@@ -20,117 +12,57 @@ export interface UploadResult {
   error?: string;
 }
 
-async function ensureBucketExists(): Promise<void> {
+export async function uploadImage(file: File, entityType: EntityType, entityId: string): Promise<UploadResult> {
   try {
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
-
-    if (!bucketExists) {
-      const { error } = await supabase.storage.createBucket(BUCKET_NAME, {
-        public: true,
-        fileSizeLimit: MAX_FILE_SIZE,
-        allowedMimeTypes: ALLOWED_TYPES
-      });
-
-      if (error) {
-        console.error('Error creating bucket:', error);
-      }
-    }
-  } catch (error) {
-    console.error('Error checking bucket:', error);
-  }
-}
-
-export async function uploadImage(
-  file: File,
-  entityType: EntityType,
-  entityId: string
-): Promise<UploadResult> {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return {
-        success: false,
-        error: 'Please login to admin to upload images. Authentication required.'
-      };
+    const token = localStorage.getItem('adminAccessToken');
+    if (!token) {
+      return { success: false, error: 'Please login to admin to upload images. Authentication required.' };
     }
 
-    if (!file) {
-      return { success: false, error: 'No file provided' };
-    }
-
+    if (!file) return { success: false, error: 'No file provided' };
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return {
-        success: false,
-        error: `Invalid file type. Allowed: JPG, PNG, WEBP. Got: ${file.type}`
-      };
+      return { success: false, error: `Invalid file type. Allowed: JPG, PNG, WEBP. Got: ${file.type}` };
     }
-
     if (file.size > MAX_FILE_SIZE) {
-      return {
-        success: false,
-        error: `File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024} MB`
-      };
+      return { success: false, error: `File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024} MB` };
     }
 
-    await ensureBucketExists();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('entityType', entityType);
+    formData.append('entityId', entityId);
 
-    const timestamp = Date.now();
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${entityType === 'poets' ? 'avatar' : entityType === 'shayari' ? 'featured' : 'cover'}-${timestamp}.${ext}`;
-    const filePath = `${entityType}/${entityId}/${fileName}`;
+    const res = await fetch(`${BASE_URL}/api/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    });
 
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    const data = await res.json();
+    if (!res.ok) return { success: false, error: data.error || 'Upload failed' };
 
-    if (error) {
-      console.error('Upload error:', error);
-      return {
-        success: false,
-        error: `Upload failed: ${error.message}`
-      };
-    }
-
-    const { data: urlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(filePath);
-
-    return {
-      success: true,
-      publicUrl: urlData.publicUrl,
-      path: filePath
-    };
+    return { success: true, publicUrl: data.publicUrl, path: data.path };
   } catch (error) {
     console.error('Unexpected error during upload:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
   }
 }
 
 export async function deleteImage(path: string): Promise<boolean> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const token = localStorage.getItem('adminAccessToken');
+    if (!token) {
       console.error('Delete failed: Not authenticated');
       return false;
     }
 
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .remove([path]);
+    const res = await fetch(`${BASE_URL}/api/upload`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ path })
+    });
 
-    if (error) {
-      console.error('Delete error:', error);
-      return false;
-    }
-
-    return true;
+    return res.ok;
   } catch (error) {
     console.error('Unexpected error during delete:', error);
     return false;

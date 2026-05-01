@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import { AdSlot } from './components/ads/AdSlot';
@@ -22,32 +23,106 @@ import DictionaryDetailPage from './pages/DictionaryDetailPage';
 import AboutPage from './pages/AboutPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import { isUsingSupabaseFallback, supabase } from './lib/supabase';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
-interface RouteState {
-  page: string;
-  id?: string;
+const pagePaths: Record<string, string> = {
+  home: '/',
+  explore: '/explore',
+  poets: '/poets',
+  topics: '/topics',
+  tags: '/tags',
+  collections: '/collections',
+  search: '/search',
+  games: '/games',
+  ebooks: '/ebooks',
+  dictionary: '/dictionary',
+  about: '/about',
+  admin: '/admin',
+  'admin-login': '/admin-login',
+};
+
+const getCurrentPage = (pathname: string) => {
+  const [, firstSegment] = pathname.split('/');
+
+  if (!firstSegment) return 'home';
+  if (firstSegment === 'admin-login') return 'admin-login';
+  if (firstSegment === 'admin') return 'admin';
+
+  return firstSegment;
+};
+
+function PoetRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { poetId } = useParams();
+  return poetId ? <PoetDetailPage poetId={poetId} onNavigate={onNavigate} /> : <PoetsPage onNavigate={onNavigate} />;
+}
+
+function TopicRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { topicSlug } = useParams();
+  return topicSlug ? <TopicDetailPage topicSlug={topicSlug} onNavigate={onNavigate} /> : <TopicsPage onNavigate={onNavigate} />;
+}
+
+function TagRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { tagSlug } = useParams();
+  return tagSlug ? <TagDetailPage tagSlug={tagSlug} onNavigate={onNavigate} /> : <TagsPage onNavigate={onNavigate} />;
+}
+
+function CollectionRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { collectionId } = useParams();
+  return collectionId ? <CollectionDetailPage collectionId={collectionId} onNavigate={onNavigate} /> : <CollectionsPage onNavigate={onNavigate} />;
+}
+
+function ShayariRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { shayariId } = useParams();
+  return shayariId ? <ShayariDetailPage shayariId={shayariId} onNavigate={onNavigate} /> : <ExplorePage onNavigate={onNavigate} />;
+}
+
+function EbookRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { ebookId } = useParams();
+  return ebookId ? <EbookDetailPage ebookId={ebookId} onNavigate={onNavigate} /> : <EbooksPage onNavigate={onNavigate} />;
+}
+
+function DictionaryRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const [searchParams] = useSearchParams();
+  return <DictionaryPage onNavigate={onNavigate} initialQuery={searchParams.get('query') || ''} />;
+}
+
+function DictionaryWordRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { wordId } = useParams();
+  return wordId ? <DictionaryDetailPage wordId={wordId} onNavigate={onNavigate} /> : <DictionaryPage onNavigate={onNavigate} />;
 }
 
 function App() {
-  const [route, setRoute] = useState<RouteState>({ page: 'home' });
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const currentPage = getCurrentPage(location.pathname);
+  const isAdminPage = currentPage === 'admin-login' || currentPage === 'admin';
 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        const token = localStorage.getItem('adminAccessToken');
+        if (!token) {
+          setIsAdminLoggedIn(false);
+          localStorage.removeItem('adminLoggedIn');
+          return;
+        }
+        const res = await fetch(`${API_BASE_URL}/api/auth/session`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
           setIsAdminLoggedIn(true);
           localStorage.setItem('adminLoggedIn', 'true');
         } else {
           setIsAdminLoggedIn(false);
           localStorage.removeItem('adminLoggedIn');
+          localStorage.removeItem('adminAccessToken');
+          localStorage.removeItem('adminRefreshToken');
         }
       } catch (error) {
-        console.error('Error checking Supabase session:', error);
+        console.error('Error checking session:', error);
         setIsAdminLoggedIn(false);
         localStorage.removeItem('adminLoggedIn');
       } finally {
@@ -56,63 +131,86 @@ function App() {
     };
 
     checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setIsAdminLoggedIn(true);
-        localStorage.setItem('adminLoggedIn', 'true');
-      } else {
-        setIsAdminLoggedIn(false);
-        localStorage.removeItem('adminLoggedIn');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'admin-login') {
-        setRoute({ page: 'admin-login' });
-      } else if (hash === 'admin') {
-        setRoute({ page: 'admin' });
-      }
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
-
-    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [route]);
+  }, [location.pathname, location.search]);
 
   const handleNavigate = (page: string, id?: string) => {
-    setRoute({ page, id });
+    if (page === 'poet' && id) {
+      navigate(`/poets/${id}`);
+      return;
+    }
+
+    if (page === 'topic' && id) {
+      navigate(`/topics/${id}`);
+      return;
+    }
+
+    if (page === 'tag' && id) {
+      navigate(`/tags/${id}`);
+      return;
+    }
+
+    if (page === 'collection' && id) {
+      navigate(`/collections/${id}`);
+      return;
+    }
+
+    if (page === 'shayari' && id) {
+      navigate(`/shayari/${id}`);
+      return;
+    }
+
+    if (page === 'ebook' && id) {
+      navigate(`/ebooks/${id}`);
+      return;
+    }
+
+    if (page === 'dictionary-word' && id) {
+      navigate(`/dictionary/word/${id}`);
+      return;
+    }
+
+    if (page === 'dictionary' && id) {
+      navigate(`/dictionary?query=${encodeURIComponent(id)}`);
+      return;
+    }
+
+    navigate(pagePaths[page] || '/');
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
+    navigate('/search');
   };
 
   const handleAdminLogin = () => {
     setIsAdminLoggedIn(true);
-    setRoute({ page: 'admin' });
+    navigate('/admin');
   };
 
   const handleAdminLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      const token = localStorage.getItem('adminAccessToken');
+      if (token) {
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     setIsAdminLoggedIn(false);
     localStorage.removeItem('adminLoggedIn');
-    setRoute({ page: 'home' });
+    localStorage.removeItem('adminAccessToken');
+    localStorage.removeItem('adminRefreshToken');
+    navigate('/');
   };
 
-  const renderPage = () => {
+  const renderRoutes = () => {
     if (isCheckingAuth) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
@@ -124,123 +222,55 @@ function App() {
       );
     }
 
-    if (route.page === 'admin-login') {
-      return <AdminLoginPage onLogin={handleAdminLogin} />;
-    }
-
-    if (route.page === 'admin') {
-      if (!isAdminLoggedIn) {
-        return <AdminLoginPage onLogin={handleAdminLogin} />;
-      }
-      return <AdminDashboard onLogout={handleAdminLogout} onNavigate={handleNavigate} />;
-    }
-
-    switch (route.page) {
-      case 'home':
-        return <HomePage onNavigate={handleNavigate} />;
-
-      case 'explore':
-        return <ExplorePage onNavigate={handleNavigate} />;
-
-      case 'poets':
-        return <PoetsPage onNavigate={handleNavigate} />;
-
-      case 'poet':
-        return route.id ? (
-          <PoetDetailPage poetId={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <PoetsPage onNavigate={handleNavigate} />
-        );
-
-      case 'topics':
-        return <TopicsPage onNavigate={handleNavigate} />;
-
-      case 'topic':
-        return route.id ? (
-          <TopicDetailPage topicSlug={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <TopicsPage onNavigate={handleNavigate} />
-        );
-
-      case 'tags':
-        return <TagsPage onNavigate={handleNavigate} />;
-
-      case 'tag':
-        return route.id ? (
-          <TagDetailPage tagSlug={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <TagsPage onNavigate={handleNavigate} />
-        );
-
-      case 'collections':
-        return <CollectionsPage onNavigate={handleNavigate} />;
-
-      case 'collection':
-        return route.id ? (
-          <CollectionDetailPage collectionId={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <CollectionsPage onNavigate={handleNavigate} />
-        );
-
-      case 'shayari':
-        return route.id ? (
-          <ShayariDetailPage shayariId={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <ExplorePage onNavigate={handleNavigate} />
-        );
-
-      case 'search':
-        return <SearchPage initialQuery={searchQuery} onNavigate={handleNavigate} />;
-
-      case 'games':
-        return <GamesPage />;
-
-      case 'ebooks':
-        return <EbooksPage onNavigate={handleNavigate} />;
-
-      case 'ebook':
-        return route.id ? (
-          <EbookDetailPage ebookId={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <EbooksPage onNavigate={handleNavigate} />
-        );
-
-      case 'dictionary':
-        return <DictionaryPage onNavigate={handleNavigate} initialQuery={route.id || ''} />;
-
-      case 'dictionary-word':
-        return route.id ? (
-          <DictionaryDetailPage wordId={route.id} onNavigate={handleNavigate} />
-        ) : (
-          <DictionaryPage onNavigate={handleNavigate} />
-        );
-
-      case 'about':
-        return <AboutPage />;
-
-      default:
-        return <HomePage onNavigate={handleNavigate} />;
-    }
+    return (
+      <Routes>
+        <Route path="/" element={<HomePage onNavigate={handleNavigate} />} />
+        <Route path="/explore" element={<ExplorePage onNavigate={handleNavigate} />} />
+        <Route path="/poets" element={<PoetsPage onNavigate={handleNavigate} />} />
+        <Route path="/poets/:poetId" element={<PoetRoute onNavigate={handleNavigate} />} />
+        <Route path="/topics" element={<TopicsPage onNavigate={handleNavigate} />} />
+        <Route path="/topics/:topicSlug" element={<TopicRoute onNavigate={handleNavigate} />} />
+        <Route path="/tags" element={<TagsPage onNavigate={handleNavigate} />} />
+        <Route path="/tags/:tagSlug" element={<TagRoute onNavigate={handleNavigate} />} />
+        <Route path="/collections" element={<CollectionsPage onNavigate={handleNavigate} />} />
+        <Route path="/collections/:collectionId" element={<CollectionRoute onNavigate={handleNavigate} />} />
+        <Route path="/shayari/:shayariId" element={<ShayariRoute onNavigate={handleNavigate} />} />
+        <Route path="/search" element={<SearchPage initialQuery={searchQuery} onNavigate={handleNavigate} />} />
+        <Route path="/games" element={<GamesPage />} />
+        <Route path="/ebooks" element={<EbooksPage onNavigate={handleNavigate} />} />
+        <Route path="/ebooks/:ebookId" element={<EbookRoute onNavigate={handleNavigate} />} />
+        <Route path="/dictionary" element={<DictionaryRoute onNavigate={handleNavigate} />} />
+        <Route path="/dictionary/word/:wordId" element={<DictionaryWordRoute onNavigate={handleNavigate} />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/admin-login" element={<AdminLoginPage onLogin={handleAdminLogin} />} />
+        <Route
+          path="/admin"
+          element={
+            isAdminLoggedIn ? (
+              <AdminDashboard onLogout={handleAdminLogout} onNavigate={handleNavigate} />
+            ) : (
+              <AdminLoginPage onLogin={handleAdminLogin} />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   };
 
-  if (route.page === 'admin-login' || route.page === 'admin') {
+  if (isAdminPage) {
     return (
       <div className="min-h-screen bg-white dark:bg-slate-900">
-        {renderPage()}
+        {renderRoutes()}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 transition-colors">
-      {isUsingSupabaseFallback && (
-        <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
-          Supabase env vars are missing or invalid. Using fallback client configuration.
-        </div>
-      )}
-      <Header currentPage={route.page} onNavigate={handleNavigate} onSearch={handleSearch} />
+      <Header currentPage={currentPage} onNavigate={handleNavigate} onSearch={handleSearch} />
       <AdSlot placement="header" pageScope="global" />
-      <main className="flex-1">{renderPage()}</main>
+      <main className="flex-1">{renderRoutes()}</main>
       <AdSlot placement="footer" pageScope="global" />
       <Footer />
     </div>

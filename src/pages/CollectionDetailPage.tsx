@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { BookMarked } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import { api, Collection, Shayari } from '../services/api';
-import { supabase } from '../lib/supabase';
 
 interface CollectionDetailPageProps {
   collectionId: string;
@@ -22,27 +21,7 @@ export default function CollectionDetailPage({ collectionId, onNavigate }: Colle
         setCollection(collectionRes);
 
         if (collectionRes) {
-          const { data: collectionItems } = await supabase
-            .from('collection_items')
-            .select(`
-              id,
-              sort_order,
-              shayari:shayari_id (
-                id,
-                form,
-                is_trending,
-                is_featured,
-                featured_image_url,
-                featured_image_alt,
-                poets:poet_id (id, name, slug, avatar_url),
-                shayari_language_versions (language, text)
-              )
-            `)
-            .eq('collection_id', collectionId)
-            .order('sort_order');
-
-          const shayariData = collectionItems?.map((item: any) => item.shayari).filter(Boolean) || [];
-          setCollectionShayari(shayariData);
+          setCollectionShayari(collectionRes.items || []);
         }
       } catch (error) {
         console.error('Error loading collection:', error);

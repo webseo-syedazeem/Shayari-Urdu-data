@@ -1,15 +1,24 @@
-/*
- * PUBLIC API SERVICE
- *
- * This file is the only integration point for public-facing data access.
- * Currently uses direct Supabase client (VITE_DATA_SOURCE=bolt).
- *
- * FUTURE MIGRATION: When VITE_DATA_SOURCE=node, this file will be updated to call
- * Node.js REST API endpoints instead of direct database access. UI components will
- * remain unchanged as they depend only on this service interface.
- */
-import { supabase } from '../lib/supabase';
-export { supabase };
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
+
+async function apiFetch<T = any>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options?.headers }
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(err.error || err.message || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+function buildQuery(params: Record<string, any>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+  }
+  return q.toString() ? `?${q.toString()}` : '';
+}
 
 export interface Poet {
   id: string;
@@ -43,10 +52,7 @@ export interface Shayari {
   seo_description?: string | null;
   seo_keywords?: string | null;
   poets?: Poet;
-  shayari_language_versions?: Array<{
-    language: string;
-    text: string;
-  }>;
+  shayari_language_versions?: Array<{ language: string; text: string }>;
 }
 
 export interface Topic {
@@ -122,446 +128,124 @@ export interface Tag {
 
 class ApiService {
   async getPoets(params?: { page?: number; pageSize?: number; search?: string }) {
-    let query = supabase.from('poets').select('*').order('name');
-
-    if (params?.search) {
-      query = query.ilike('name', `%${params.search}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    return { data: data || [], pagination: {} };
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize, search: params?.search });
+    return apiFetch<{ data: Poet[]; pagination: any }>(`/api/poets${qs}`);
   }
 
   async getPoet(slug: string) {
-    const { data: poet, error } = await supabase
-      .from('poets')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    const { count } = await supabase
-      .from('shayari')
-      .select('*', { count: 'exact', head: true })
-      .eq('poet_id', poet.id);
-
-    const { data: popularShayari } = await supabase
-      .from('shayari')
-      .select('id')
-      .eq('poet_id', poet.id)
-      .order('popularity_score', { ascending: false })
-      .limit(5);
-
-    return {
-      ...poet,
-      shayariCounts: { total: count || 0 },
-      popularShayariIds: popularShayari?.map(s => s.id) || []
-    };
+    const data = await apiFetch<any>(`/api/poets/${encodeURIComponent(slug)}`);
+    const total = typeof data.shayariCounts === 'object'
+      ? Object.values(data.shayariCounts as Record<string, number>).reduce((a, b) => a + b, 0)
+      : 0;
+    return { ...data, shayariCounts: { total, ...data.shayariCounts } };
   }
 
   async getPoetById(id: string) {
-    const { data: poet, error } = await supabase
-      .from('poets')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    if (!poet) return null;
-
-    const { count } = await supabase
-      .from('shayari')
-      .select('*', { count: 'exact', head: true })
-      .eq('poet_id', poet.id);
-
-    const { data: popularShayari } = await supabase
-      .from('shayari')
-      .select('id')
-      .eq('poet_id', poet.id)
-      .order('popularity_score', { ascending: false })
-      .limit(5);
-
-    return {
-      ...poet,
-      shayariCounts: { total: count || 0 },
-      popularShayariIds: popularShayari?.map(s => s.id) || []
-    };
+    try {
+      const data = await apiFetch<any>(`/api/poets/by-id/${encodeURIComponent(id)}`);
+      const total = typeof data.shayariCounts === 'object'
+        ? Object.values(data.shayariCounts as Record<string, number>).reduce((a, b) => a + b, 0)
+        : 0;
+      return { ...data, shayariCounts: { total, ...data.shayariCounts } };
+    } catch {
+      return null;
+    }
   }
 
-  async getShayari(params?: {
-    page?: number;
-    pageSize?: number;
-    language?: string;
-    form?: string;
-    topic?: string;
-    sort?: 'trending' | 'mostLoved' | 'latest';
-    poetId?: string;
-    search?: string;
-  }) {
-    let query = supabase
-      .from('shayari')
-      .select(`
-        *,
-        poets (id, name, slug, avatar_url),
-        shayari_language_versions (language, text)
-      `);
-
-    if (params?.poetId) {
-      query = query.eq('poet_id', params.poetId);
-    }
-
-    if (params?.form) {
-      query = query.eq('form', params.form);
-    }
-
-    if (params?.search) {
-      query = query.or(`id.eq.${params.search}`);
-    }
-
-    if (params?.sort === 'trending') {
-      query = query.eq('is_trending', true);
-    } else if (params?.sort === 'mostLoved') {
-      query = query.order('popularity_score', { ascending: false });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    const pageSize = params?.pageSize || 20;
-    const page = params?.page || 1;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    query = query.range(from, to);
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    return { data: data || [], pagination: { page, pageSize } };
+  async getShayari(params?: { page?: number; pageSize?: number; language?: string; form?: string; topic?: string; sort?: 'trending' | 'mostLoved' | 'latest'; poetId?: string; search?: string }) {
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize, form: params?.form, topic: params?.topic, sort: params?.sort, poetId: params?.poetId });
+    return apiFetch<{ data: Shayari[]; pagination: any }>(`/api/shayari${qs}`);
   }
 
   async getShayariById(id: string) {
-    const { data: shayari, error } = await supabase
-      .from('shayari')
-      .select(`
-        *,
-        poets (id, name, slug, avatar_url),
-        shayari_language_versions (language, text)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    const { data: relatedShayari } = await supabase
-      .from('shayari')
-      .select(`
-        *,
-        poets (id, name, slug, avatar_url),
-        shayari_language_versions (language, text)
-      `)
-      .eq('poet_id', shayari.poet_id)
-      .neq('id', id)
-      .limit(5);
-
+    const data = await apiFetch<any>(`/api/shayari/${encodeURIComponent(id)}`);
     return {
-      ...shayari,
-      languageVersions: shayari.shayari_language_versions || [],
-      topics: [],
-      relatedShayari: relatedShayari || []
+      ...data,
+      languageVersions: data.shayari_language_versions || [],
+      topics: data.topics || [],
+      relatedShayari: data.relatedShayari || []
     };
   }
 
   async getTopics() {
-    const { data: topics, error } = await supabase
-      .from('topics')
-      .select('*')
-      .order('name');
-
-    if (error) throw new Error(error.message);
-
-    const topicsWithCounts = await Promise.all(
-      (topics || []).map(async (topic) => {
-        const { count } = await supabase
-          .from('shayari_topics')
-          .select('*', { count: 'exact', head: true })
-          .eq('topic_id', topic.id);
-
-        return { ...topic, count: count || 0 };
-      })
-    );
-
-    return { data: topicsWithCounts };
+    return apiFetch<{ data: Topic[] }>('/api/topics');
   }
 
   async getTopic(slug: string) {
-    const { data: topic, error } = await supabase
-      .from('topics')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    if (!topic) throw new Error('Topic not found');
-
-    const { data: shayariTopics } = await supabase
-      .from('shayari_topics')
-      .select('shayari_id')
-      .eq('topic_id', topic.id);
-
-    const shayariIds = shayariTopics?.map(st => st.shayari_id) || [];
-
-    let shayari: any[] = [];
-    if (shayariIds.length > 0) {
-      const { data } = await supabase
-        .from('shayari')
-        .select(`
-          *,
-          poets (id, name, slug, avatar_url),
-          shayari_language_versions (language, text)
-        `)
-        .in('id', shayariIds);
-      shayari = data || [];
-    }
-
-    return { ...topic, shayari, pagination: {} };
+    return apiFetch<any>(`/api/topics/${encodeURIComponent(slug)}`);
   }
 
   async getTags() {
-    const { data: tags, error } = await supabase
-      .from('tags')
-      .select('*')
-      .order('name');
-
-    if (error) throw new Error(error.message);
-
-    const tagsWithCounts = await Promise.all(
-      (tags || []).map(async (tag) => {
-        const { count } = await supabase
-          .from('shayari_tags')
-          .select('*', { count: 'exact', head: true })
-          .eq('tag_id', tag.id);
-
-        return { ...tag, count: count || 0 };
-      })
-    );
-
-    return { data: tagsWithCounts };
+    return apiFetch<{ data: Tag[] }>('/api/tags');
   }
 
   async getTag(slug: string) {
-    const { data: tag, error } = await supabase
-      .from('tags')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    if (!tag) throw new Error('Tag not found');
-
-    const { data: shayariTags } = await supabase
-      .from('shayari_tags')
-      .select('shayari_id')
-      .eq('tag_id', tag.id);
-
-    const shayariIds = shayariTags?.map(st => st.shayari_id) || [];
-
-    let shayari: any[] = [];
-    if (shayariIds.length > 0) {
-      const { data } = await supabase
-        .from('shayari')
-        .select(`
-          *,
-          poets (id, name, slug, avatar_url),
-          shayari_language_versions (language, text)
-        `)
-        .in('id', shayariIds);
-      shayari = data || [];
-    }
-
-    return { ...tag, shayari, pagination: {} };
+    return apiFetch<any>(`/api/tags/${encodeURIComponent(slug)}`);
   }
 
   async getCollections(params?: { page?: number; pageSize?: number }) {
-    const { data, error } = await supabase
-      .from('collections')
-      .select(`
-        *,
-        collection_items (count)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) throw new Error(error.message);
-
-    const collectionsWithCounts = (data || []).map((collection: any) => ({
-      ...collection,
-      itemCount: collection.collection_items?.[0]?.count || 0
-    }));
-
-    return { data: collectionsWithCounts, pagination: {} };
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize });
+    return apiFetch<{ data: Collection[]; pagination: any }>(`/api/collections${qs}`);
   }
 
   async getCollection(slug: string) {
-    const { data: collection, error } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    const { data: collectionItems } = await supabase
-      .from('collection_items')
-      .select('shayari_id')
-      .eq('collection_id', collection.id)
-      .order('sort_order');
-
-    const shayariIds = collectionItems?.map(ci => ci.shayari_id) || [];
-
-    let items: any[] = [];
-    if (shayariIds.length > 0) {
-      const { data } = await supabase
-        .from('shayari')
-        .select(`
-          *,
-          poets (id, name, slug, avatar_url),
-          shayari_language_versions (language, text)
-        `)
-        .in('id', shayariIds);
-      items = data || [];
-    }
-
-    return { ...collection, items, pagination: {} };
+    return apiFetch<any>(`/api/collections/${encodeURIComponent(slug)}`);
   }
 
   async getCollectionById(id: string) {
-    const { data: collection, error } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    return collection;
+    try {
+      return apiFetch<any>(`/api/collections/by-id/${encodeURIComponent(id)}`);
+    } catch {
+      return null;
+    }
   }
 
   async getEbooks(params?: { page?: number; pageSize?: number; poetId?: string }) {
-    let query = supabase
-      .from('ebooks')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (params?.poetId) {
-      query = query.eq('poet_id', params.poetId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    return { data: data || [], pagination: {} };
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize, poetId: params?.poetId });
+    return apiFetch<{ data: Ebook[]; pagination: any }>(`/api/ebooks${qs}`);
   }
 
   async getEbook(slug: string) {
-    const { data, error } = await supabase
-      .from('ebooks')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return data;
+    return apiFetch<Ebook>(`/api/ebooks/${encodeURIComponent(slug)}`);
   }
 
   async getEbookById(id: string) {
-    const { data, error } = await supabase
-      .from('ebooks')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-
-    return data;
+    try {
+      return apiFetch<Ebook>(`/api/ebooks/by-id/${encodeURIComponent(id)}`);
+    } catch {
+      return null;
+    }
   }
 
   async getDictionaryEntries(params?: { search?: string; query?: string; page?: number; pageSize?: number }) {
-    let query = supabase
-      .from('dictionary_entries')
-      .select('*')
-      .order('word_key');
-
     const searchTerm = params?.search || params?.query;
-    if (searchTerm) {
-      query = query.or(`word_key.ilike.%${searchTerm}%,word_roman.ilike.%${searchTerm}%,word_english.ilike.%${searchTerm}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    return { data: data || [], pagination: {} };
+    const qs = buildQuery({ query: searchTerm, page: params?.page, pageSize: params?.pageSize });
+    return apiFetch<{ data: DictionaryEntry[]; pagination: any }>(`/api/dictionary${qs}`);
   }
 
   async getDictionaryEntry(wordKey: string) {
-    const { data, error } = await supabase
-      .from('dictionary_entries')
-      .select('*')
-      .eq('word_key', wordKey)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return data;
+    return apiFetch<DictionaryEntry>(`/api/dictionary/${encodeURIComponent(wordKey)}`);
   }
 
   async getDictionaryEntryById(id: string) {
-    const { data, error } = await supabase
-      .from('dictionary_entries')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-
-    return data;
+    try {
+      return apiFetch<DictionaryEntry>(`/api/dictionary/by-id/${encodeURIComponent(id)}`);
+    } catch {
+      return null;
+    }
   }
 
   async getChatMessages(shayariId: string, params?: { page?: number; pageSize?: number }) {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('shayari_id', shayariId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw new Error(error.message);
-
-    return { data: data || [], pagination: {} };
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize });
+    return apiFetch<{ data: any[]; pagination: any }>(`/api/shayari/${encodeURIComponent(shayariId)}/chat${qs}`);
   }
 
   async getAdSlots() {
-    const { data, error } = await supabase
-      .from('ad_slots')
-      .select('*')
-      .eq('is_active', true);
-
-    if (error) throw new Error(error.message);
-
-    return { data: data || [] };
+    return apiFetch<{ data: any[] }>('/api/ad-slots');
   }
 
   async getAdSlot(key: string) {
-    const { data, error } = await supabase
-      .from('ad_slots')
-      .select('*')
-      .eq('slot_key', key)
-      .eq('is_active', true)
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return data;
+    return apiFetch<any>(`/api/ad-slots/${encodeURIComponent(key)}`);
   }
 }
 

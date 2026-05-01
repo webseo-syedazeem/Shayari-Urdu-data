@@ -1,4 +1,3 @@
-import { supabase } from './api';
 
 interface WordPressPost {
   id: number;
@@ -73,18 +72,20 @@ export class WordPressImporter {
     lastPostId: 0
   };
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+constructor(baseUrl: string) {
+  if (baseUrl) {
+    const url = new URL(baseUrl.replace(/\/$/, ''));
+    this.baseUrl = url.origin;
+  } else {
+    this.baseUrl = '';
   }
+}
 
   private async ensureAuth(): Promise<boolean> {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (!session || error) {
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        this.progress.authExpired = true;
-        return false;
-      }
+    const token = localStorage.getItem('adminAccessToken');
+    if (!token) {
+      this.progress.authExpired = true;
+      return false;
     }
     return true;
   }

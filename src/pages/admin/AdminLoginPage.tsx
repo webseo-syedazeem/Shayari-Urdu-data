@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
-import { getSupabaseEnvErrorMessage, isUsingSupabaseFallback, supabase } from '../../lib/supabase';
+
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
 interface AdminLoginPageProps {
   onLogin: () => void;
@@ -18,20 +19,28 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
     setLoading(true);
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const res = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       });
 
-      if (authError) {
-        setError(authError.message);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Login failed');
         setLoading(false);
         return;
       }
 
-      if (data.session) {
+      if (data.access_token) {
+        localStorage.setItem('adminAccessToken', data.access_token);
+        if (data.refresh_token) localStorage.setItem('adminRefreshToken', data.refresh_token);
         localStorage.setItem('adminLoggedIn', 'true');
         onLogin();
+      } else {
+        setError('Login failed: no session returned');
+        setLoading(false);
       }
     } catch (err: any) {
       console.error('Login error:', err);
@@ -49,23 +58,12 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">
-          Admin Panel
-        </h1>
-        <p className="text-center text-gray-600 mb-8">
-          ShayariUrdu.com Management
-        </p>
+        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Admin Panel</h1>
+        <p className="text-center text-gray-600 mb-8">ShayariUrdu.com Management</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isUsingSupabaseFallback && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
-              {getSupabaseEnvErrorMessage() || 'Using fallback Supabase configuration.'}
-            </div>
-          )}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               id="email"
               type="email"
@@ -79,9 +77,7 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               id="password"
               type="password"
@@ -95,9 +91,7 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
           )}
 
           <button
@@ -110,8 +104,7 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Use your admin Supabase Auth credentials</p>
-          <p className="mt-2 text-xs">Email + Password authentication required</p>
+          <p>Use your Supabase Auth admin credentials</p>
         </div>
       </div>
     </div>
