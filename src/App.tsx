@@ -23,6 +23,7 @@ import DictionaryDetailPage from './pages/DictionaryDetailPage';
 import AboutPage from './pages/AboutPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import ChatWidget from './components/ChatWidget';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
 const pagePaths: Record<string, string> = {
@@ -273,6 +274,7 @@ function App() {
       <main className="flex-1">{renderRoutes()}</main>
       <AdSlot placement="footer" pageScope="global" />
       <Footer />
+      <ChatWidget />
     </div>
   );
 }
