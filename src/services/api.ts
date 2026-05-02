@@ -44,9 +44,15 @@ export interface Shayari {
   is_featured: boolean;
   popularity_score: number;
   created_at: string;
+  updated_at?: string | null;
   slug?: string | null;
-  featured_image_url?: string;
-  featured_image_alt?: string;
+  title?: string | null;
+  source?: string | null;
+  wordpress_post_id?: number | null;
+  wordpress_url?: string | null;
+  canonical_url?: string | null;
+  featured_image_url?: string | null;
+  featured_image_alt?: string | null;
   wordpress_featured_image_id?: number | null;
   seo_title?: string | null;
   seo_description?: string | null;

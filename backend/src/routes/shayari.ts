@@ -5,13 +5,33 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { page = '1', pageSize = '20', language, form, topic, sort = 'latest', poetId } = req.query;
+    const { page = '1', pageSize = '20', form, topic, sort = 'latest', poetId, q } = req.query;
     const offset = (Number(page) - 1) * Number(pageSize);
 
     let query = supabase.from('shayari').select(`*, poets(name, slug, avatar_url), shayari_language_versions(language, text)`, { count: 'exact' });
 
     if (poetId) query = query.eq('poet_id', poetId);
     if (form) query = query.eq('form', form);
+    if (q) {
+      const searchTerm = String(q).trim();
+      if (searchTerm) {
+        // Also search inside shayari_language_versions.text (actual shayari content)
+        const { data: langMatches } = await supabase
+          .from('shayari_language_versions')
+          .select('shayari_id')
+          .ilike('text', `%${searchTerm}%`);
+
+        const langIds = [...new Set((langMatches || []).map((v: any) => v.shayari_id))];
+
+        const textFilter = `title.ilike.*${searchTerm}*,slug.ilike.*${searchTerm}*,seo_title.ilike.*${searchTerm}*,seo_description.ilike.*${searchTerm}*`;
+
+        if (langIds.length > 0) {
+          query = query.or(`${textFilter},id.in.(${langIds.join(',')})`);
+        } else {
+          query = query.or(textFilter);
+        }
+      }
+    }
     if (topic) {
       const { data: topicShayari } = await supabase.from('shayari_topics').select('shayari_id').eq('topic_id', topic);
       const ids = (topicShayari || []).map((s: any) => s.shayari_id);

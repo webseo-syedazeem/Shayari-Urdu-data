@@ -37,14 +37,32 @@ interface WPMedia {
   alt_text?: string;
 }
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#8216;/g, '‘')   // left single quotation mark '
+    .replace(/&#8217;/g, '’')   // right single quotation mark '
+    .replace(/&#8220;/g, '“')   // left double quotation mark "
+    .replace(/&#8221;/g, '”')   // right double quotation mark "
+    .replace(/&#8211;/g, '–')   // en dash –
+    .replace(/&#8212;/g, '—')   // em dash —
+    .replace(/&#8230;/g, '…')   // ellipsis …
+    .replace(/&#039;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
 function cleanSeoTitle(title: string): string {
-  return title.replace(/\s*[-|]\s*Urdu Poetry\s*$/i, '').trim();
+  return decodeHtmlEntities(title).replace(/\s*[-|]\s*Urdu Poetry\s*$/i, '').trim();
 }
 
 function stripHtml(html: string): string {
   return html
-    .replace(/<br\s*\/?>/gi, '\n')   // <br> → newline before stripping tags
-    .replace(/<\/h[1-6]>/gi, '\n')   // closing headings → newline
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
@@ -63,8 +81,8 @@ function extractFirstImageUrl(html: string): string | null {
 }
 
 function extractTitle(post: WPPost): string {
-  if (typeof post.title === 'string') return post.title;
-  return post.title?.rendered || '';
+  const raw = typeof post.title === 'string' ? post.title : (post.title?.rendered || '');
+  return decodeHtmlEntities(raw);
 }
 
 function extractContent(post: WPPost): string {
@@ -75,11 +93,25 @@ function extractContent(post: WPPost): string {
 function extractLanguageVersions(content: string) {
   const lines = content.split('\n').map(l => l.trim()).filter(l => l);
   if (lines.length === 0) return { roman: '', urdu: '', hindi: '' };
-  if (lines.length > 6) return { roman: lines.join('\n'), urdu: '', hindi: '' };
+
+  const romanLines: string[] = [];
+  const urduLines: string[]  = [];
+  const hindiLines: string[] = [];
+
+  for (const line of lines) {
+    if (/[؀-ۿ]/.test(line)) {
+      urduLines.push(line);          // Arabic/Urdu script
+    } else if (/[ऀ-ॿ]/.test(line)) {
+      hindiLines.push(line);         // Devanagari/Hindi script
+    } else {
+      romanLines.push(line);         // Latin/Roman Urdu
+    }
+  }
+
   return {
-    roman: lines.slice(0, 2).join('\n'),
-    urdu: lines.slice(2, 4).join('\n'),
-    hindi: lines.slice(4, 6).join('\n'),
+    roman: romanLines.join('\n'),
+    urdu:  urduLines.join('\n'),
+    hindi: hindiLines.join('\n'),
   };
 }
 
@@ -280,7 +312,7 @@ router.post('/', async (req: Request, res: Response) => {
           if (!languages.roman && !languages.urdu && !languages.hindi) { progress.skipped++; continue; }
 
           const seoTitle = cleanSeoTitle(post.yoast_head_json?.title || title);
-          const seoDesc = post.yoast_head_json?.description || content.slice(0, 160);
+          const seoDesc = (post.yoast_head_json?.description || content.slice(0, 160)).trim() || null;
           const canonicalUrl = post.yoast_head_json?.canonical || null;
 
           let featuredImageUrl: string | null = null;

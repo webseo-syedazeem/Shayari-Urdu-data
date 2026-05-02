@@ -179,6 +179,7 @@ export const adminApi = {
     const qs = new URLSearchParams();
     qs.set('page', String(page));
     qs.set('pageSize', String(pageSize));
+    if (query && query.trim()) qs.set('q', query.trim());
     if (form && form !== 'all') qs.set('form', form);
     if (poetId && poetId !== 'all') qs.set('poetId', poetId);
 
@@ -187,15 +188,6 @@ export const adminApi = {
 
     if (language && language !== 'all') {
       results = results.filter((s: any) => s.shayari_language_versions?.some((v: any) => v.language === language));
-    }
-
-    if (query && query.trim()) {
-      const searchTerm = query.trim().toLowerCase();
-      results = results.filter((s: any) => {
-        const hasMatchingText = s.shayari_language_versions?.some((v: any) => v.text?.toLowerCase().includes(searchTerm));
-        const hasMatchingPoet = s.poets?.name?.toLowerCase().includes(searchTerm);
-        return hasMatchingText || hasMatchingPoet;
-      });
     }
 
     return { data: results, total: result.pagination?.total || 0 };

@@ -63,25 +63,73 @@ export default function ManageShayariPage() {
   const [addingTopic, setAddingTopic] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [loadLimit, setLoadLimit] = useState(100);
+  const [loadLimitInput, setLoadLimitInput] = useState('100');
+  const FETCH_CHUNK = 1000; // max rows Supabase returns per request
 
   useEffect(() => {
-    loadShayari();
+    loadShayari(1, '', 100);
     loadPoets();
     loadTopics();
     loadTags();
   }, []);
 
-  const loadShayari = async () => {
+  const loadShayari = async (displayPage = 1, query = '', limit = loadLimit) => {
     try {
       setLoading(true);
-      const data = await adminApi.get('/shayari');
-      setShayari(data);
+      setError('');
+
+      if (query.trim()) {
+        // Search: paginated with `limit` per page, server searches all records
+        const result = await adminApi.searchShayari({ query, page: displayPage, pageSize: limit });
+        setShayari(result.data || []);
+        setTotalRecords(result.total);
+        setCurrentPage(displayPage);
+      } else if (limit <= FETCH_CHUNK) {
+        // No search, small page size: single backend request
+        const result = await adminApi.searchShayari({ query: '', page: displayPage, pageSize: limit });
+        setShayari(result.data || []);
+        setTotalRecords(result.total);
+        setCurrentPage(displayPage);
+      } else {
+        // No search, large page size (>1000): chunk-fetch the correct window
+        // startRecord is 0-indexed position of the first record on this display page
+        const startRecord = (displayPage - 1) * limit;
+        const backendStartPage = Math.floor(startRecord / FETCH_CHUNK) + 1;
+        const numChunks = Math.ceil(limit / FETCH_CHUNK);
+
+        let allChunks: any[] = [];
+        let total = 0;
+
+        for (let i = 0; i < numChunks; i++) {
+          const result = await adminApi.searchShayari({ query: '', page: backendStartPage + i, pageSize: FETCH_CHUNK });
+          total = result.total;
+          const rows = result.data || [];
+          allChunks = allChunks.concat(rows);
+          if (rows.length < FETCH_CHUNK) break;
+        }
+
+        // Trim to exact window: skip the partial overlap at the start of the first chunk
+        const localStart = startRecord % FETCH_CHUNK;
+        setShayari(allChunks.slice(localStart, localStart + limit));
+        setTotalRecords(total);
+        setCurrentPage(displayPage);
+      }
     } catch (error) {
       console.error('Error loading shayari:', error);
       setError('Failed to load shayari');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyLimit = () => {
+    const n = Math.max(1, parseInt(loadLimitInput) || 100);
+    setLoadLimit(n);
+    setLoadLimitInput(String(n));
+    loadShayari(1, searchQuery, n);
   };
 
   const loadPoets = async () => {
@@ -303,7 +351,7 @@ export default function ManageShayariPage() {
       setShowForm(false);
       setSelectedFile(null);
       setPreviewUrl('');
-      loadShayari();
+      loadShayari(editingId ? currentPage : 1, searchQuery);
     } catch (error: any) {
       console.error('Admin save shayari error:', error);
       setError(error.message || 'Failed to save shayari');
@@ -320,7 +368,7 @@ export default function ManageShayariPage() {
     try {
       await adminApi.delete(`/shayari/${id}`);
       setSuccess('Shayari deleted successfully');
-      loadShayari();
+      loadShayari(currentPage, searchQuery);
     } catch (error: any) {
       console.error('Error deleting shayari:', error);
       setError(error.message || 'Failed to delete shayari');
@@ -383,11 +431,7 @@ export default function ManageShayariPage() {
     });
   };
 
-  const filteredShayari = shayari.filter((s) =>
-    s.shayari_language_versions?.some((v: any) =>
-      v.text.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
+  const totalPages = Math.ceil(totalRecords / loadLimit);
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -418,17 +462,53 @@ export default function ManageShayariPage() {
         </div>
       )}
 
-      <div className="mb-6">
-        <div className="relative">
+      <div className="mb-3 flex gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search shayari..."
+            onKeyDown={(e) => e.key === 'Enter' && loadShayari(1, searchQuery)}
+            placeholder="Search by title or slug..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
           />
         </div>
+        <button
+          onClick={() => loadShayari(1, searchQuery)}
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+        >
+          Search
+        </button>
+        {searchQuery && (
+          <button
+            onClick={() => { setSearchQuery(''); loadShayari(1, '', loadLimit); }}
+            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Load limit control */}
+      <div className="mb-6 flex items-center gap-2">
+        <span className="text-sm text-gray-600">Load records:</span>
+        <input
+          type="number"
+          min="1"
+          value={loadLimitInput}
+          onChange={(e) => setLoadLimitInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleApplyLimit()}
+          className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
+        />
+        <button
+          onClick={handleApplyLimit}
+          disabled={loading}
+          className="px-4 py-1.5 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-40 transition-colors"
+        >
+          Load
+        </button>
+        <span className="text-xs text-gray-400">(enter any number, e.g. 500, 3500, 10000)</span>
       </div>
 
       {showForm && (
@@ -838,11 +918,11 @@ export default function ManageShayariPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredShayari.map((item) => (
+            {shayari.map((item: any) => (
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="text-sm text-gray-900 line-clamp-2">
-                    {item.shayari_language_versions?.[0]?.text || 'No text'}
+                    {item.seo_description || 'No text'}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -884,7 +964,34 @@ export default function ManageShayariPage() {
         </table>
       </div>
 
-      {filteredShayari.length === 0 && (
+      {/* Pagination */}
+      {totalRecords > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 mt-2 bg-white border border-gray-200 rounded-lg">
+          <div className="text-sm text-gray-600">
+            Total: <strong>{totalRecords.toLocaleString()}</strong> &nbsp;&mdash;&nbsp;
+            Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+            {' '}({loadLimit} per page)
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => loadShayari(currentPage - 1, searchQuery, loadLimit)}
+              disabled={currentPage <= 1 || loading}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              &larr; Prev
+            </button>
+            <button
+              onClick={() => loadShayari(currentPage + 1, searchQuery, loadLimit)}
+              disabled={currentPage >= totalPages || loading}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && shayari.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           No shayari found
         </div>
