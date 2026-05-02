@@ -25,7 +25,9 @@ app.use(express.json());
 
 // HTTP request logger: METHOD URL STATUS RESPONSE-TIME
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'));
-
+app.get('/', (_req, res) => {
+  res.send(`Frontend cors is configured to allow requests from: ${corsOrigin}`);
+});
 app.use('/api/auth', authRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/poets', poetsRouter);
