@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
 export interface ChatMessage {
   id?: string;
