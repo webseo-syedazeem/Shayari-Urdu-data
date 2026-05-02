@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
 import { useSocket, ChatMessage } from '../hooks/useSocket';
 
@@ -78,7 +78,7 @@ export default function ChatWidget() {
             right: '24px',
             width: '360px',
             height: '480px',
-            zIndex: 9999,
+            zIndex: 99999,
             display: 'flex',
             flexDirection: 'column',
             borderRadius: '16px',
@@ -87,6 +87,8 @@ export default function ChatWidget() {
             backgroundColor: '#ffffff',
             border: '1px solid #E5E7EB',
             fontFamily: 'system-ui, -apple-system, sans-serif',
+            pointerEvents: 'auto',
+            isolation: 'isolate',
           }}
         >
           {/* Header */}
@@ -270,6 +272,9 @@ export default function ChatWidget() {
                       color: '#1F2937',
                       outline: 'none',
                       opacity: isConnected ? 1 : 0.5,
+                      pointerEvents: 'auto',
+                      position: 'relative',
+                      zIndex: 1,
                     }}
                   />
                   <button
@@ -305,7 +310,7 @@ export default function ChatWidget() {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          zIndex: 9999,
+          zIndex: 99999,
           width: '54px',
           height: '54px',
           borderRadius: '50%',
@@ -316,6 +321,7 @@ export default function ChatWidget() {
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: '0 4px 16px rgba(30,58,95,0.35)',
+          pointerEvents: 'auto',
         }}
       >
         {isOpen ? <X size={22} color="#ffffff" /> : <MessageCircle size={22} color="#ffffff" />}
