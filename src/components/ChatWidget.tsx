@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
-import { useSocket, ChatMessage } from '../hooks/useSocket';
+import { useChat, ChatMessage } from '../hooks/useChat';
 
 const STORAGE_KEY = 'chat_username';
 
@@ -13,10 +13,9 @@ export default function ChatWidget() {
   const [username, setUsername] = useState<string>(() => localStorage.getItem(STORAGE_KEY) ?? '');
   const [nameInput, setNameInput] = useState('');
   const [textInput, setTextInput] = useState('');
-  const [onlineCount, setOnlineCount] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const { socket, isConnected, messages, sendMessage } = useSocket(username || undefined);
+  const { isConnected, messages, sendMessage, onlineCount } = useChat(username || undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
 
@@ -32,13 +31,6 @@ export default function ChatWidget() {
   }, [isOpen]);
 
   useEffect(() => {
-    if (!socket) return;
-    const handler = (count: number) => setOnlineCount(count);
-    socket.on('online_count', handler);
-    return () => { socket.off('online_count', handler); };
-  }, [socket]);
-
-  useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
@@ -50,7 +42,6 @@ export default function ChatWidget() {
     localStorage.setItem(STORAGE_KEY, trimmed);
     setUsername(trimmed);
     setNameInput('');
-    if (socket?.connected) socket.emit('user_join', trimmed);
   };
 
   const handleSend = () => {
