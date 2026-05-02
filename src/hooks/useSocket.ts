@@ -83,6 +83,13 @@ export function useSocket(username?: string): UseSocketReturn {
     };
   }, []);
 
+  // Re-emit user_join whenever username changes and socket is already connected
+  useEffect(() => {
+    if (username && socketRef.current?.connected) {
+      socketRef.current.emit('user_join', username);
+    }
+  }, [username]);
+
   const sendMessage = (username: string, message: string) => {
     if (!socketRef.current?.connected) return;
 
