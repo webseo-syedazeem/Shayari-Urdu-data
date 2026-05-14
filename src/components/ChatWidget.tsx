@@ -30,11 +30,19 @@ export default function ChatWidget() {
     if (isOpen) setUnreadCount(0);
   }, [isOpen]);
 
+
+  useEffect(() => {
+    if (isOpen) {
+      // Use instant scroll when first opening so the view starts at the bottom
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isOpen]);
+  }, [messages]);
 
   const handleSetUsername = () => {
     const trimmed = nameInput.trim();
