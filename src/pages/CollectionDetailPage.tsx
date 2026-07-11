@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookMarked } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import { api, Collection, Shayari } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface CollectionDetailPageProps {
   collectionId: string;
@@ -95,7 +96,7 @@ export default function CollectionDetailPage({ collectionId, onNavigate }: Colle
               <ShayariCard
                 key={shayari.id}
                 shayari={shayari}
-                onClick={() => onNavigate('shayari', shayari.id)}
+                onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
               />
             ))}
           </div>

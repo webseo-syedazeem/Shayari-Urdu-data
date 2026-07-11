@@ -4,6 +4,7 @@ import ShayariCard from '../components/ShayariCard';
 import EbookCard from '../components/EbookCard';
 import { Seo, generatePoetSeo } from '../components/seo/Seo';
 import { api, Poet, Shayari, Ebook } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface PoetDetailPageProps {
   poetId: string;
@@ -191,7 +192,7 @@ export default function PoetDetailPage({ poetId, onNavigate }: PoetDetailPagePro
                 <ShayariCard
                   key={shayari.id}
                   shayari={shayari}
-                  onClick={() => onNavigate('shayari', shayari.id)}
+                  onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                 />
               ))}
             </div>

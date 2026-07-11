@@ -1,14 +1,39 @@
 import { useState, useRef, useEffect } from 'react';
-import { Heart, Bookmark, Share2, Copy, Check, MessageCircle, BookOpen, X } from 'lucide-react';
+import { Heart, Bookmark, Share2, Copy, Check, MessageCircle, BookOpen } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import { api, Shayari } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
+
+function parseShayariText(seoDescription: string) {
+  const lines = seoDescription.split('\n').map(l => l.trim()).filter(Boolean);
+  const urduRegex = /[\u0600-\u06FF]/;
+  const hindiRegex = /[\u0900-\u097F]/;
+  const romanLines: string[] = [];
+  const hindiLines: string[] = [];
+  const urduLines: string[] = [];
+  lines.forEach(line => {
+    if (urduRegex.test(line)) {
+      urduLines.push(line);
+    } else if (hindiRegex.test(line)) {
+      hindiLines.push(line);
+    } else {
+      romanLines.push(line);
+    }
+  });
+  return {
+    roman: romanLines.join('\n'),
+    hindi: hindiLines.join('\n'),
+    urdu: urduLines.join('\n'),
+  };
+}
 
 interface ShayariDetailPageProps {
-  shayariId: string;
+  shayariSlug?: string;
+  shayariId?: string;
   onNavigate: (page: string, id?: string) => void;
 }
 
-export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDetailPageProps) {
+export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }: ShayariDetailPageProps) {
   const [shayari, setShayari] = useState<Shayari | null>(null);
   const [similarShayari, setSimilarShayari] = useState<Shayari[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +41,7 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [comment, setComment] = useState('');
-  const [selectedVersionIdx, setSelectedVersionIdx] = useState(0);
+  const [activeScriptTab, setActiveScriptTab] = useState<'roman' | 'hindi' | 'urdu'>('roman');
   const [dictionaryWord, setDictionaryWord] = useState('');
   const textContainerRef = useRef<HTMLDivElement>(null);
 
@@ -24,7 +49,11 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
     async function loadShayari() {
       try {
         setLoading(true);
-        const result = await api.getShayariById(shayariId);
+        const result = shayariSlug
+          ? await api.getShayariBySlug(shayariSlug)
+          : shayariId
+            ? await api.getShayariById(shayariId)
+            : null;
         setShayari(result);
 
         if (result) {
@@ -32,7 +61,7 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
             poetId: result.poet_id,
             pageSize: 4
           });
-          setSimilarShayari(similarRes.data.filter(s => s.id !== shayariId).slice(0, 3));
+          setSimilarShayari(similarRes.data.filter(s => s.id !== result.id).slice(0, 3));
         }
       } catch (error) {
         console.error('Error loading shayari:', error);
@@ -42,7 +71,7 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
     }
 
     loadShayari();
-  }, [shayariId]);
+  }, [shayariId, shayariSlug]);
 
   if (loading) {
     return (
@@ -71,11 +100,16 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
     );
   }
 
-  const currentVersion = shayari.shayari_language_versions?.[selectedVersionIdx];
   const poet = shayari.poets;
+  const parsedScripts = parseShayariText(shayari.seo_description || '');
+  const availableTabs = ([
+    parsedScripts.roman ? 'roman' : null,
+    parsedScripts.hindi ? 'hindi' : null,
+    parsedScripts.urdu ? 'urdu' : null,
+  ] as const).filter((t): t is 'roman' | 'hindi' | 'urdu' => t !== null);
 
   const getCurrentText = () => {
-    return currentVersion?.text || 'No text available';
+    return parsedScripts[activeScriptTab] || (availableTabs[0] ? parsedScripts[availableTabs[0]] : '') || 'No text available';
   };
 
   const handleCopy = () => {
@@ -113,11 +147,11 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
           {shayari.featured_image_url && (
-            <div className="w-full h-64 md:h-96 overflow-hidden">
+            <div className="w-auto md:h-auto overflow-hidden">
               <img
                 src={shayari.featured_image_url}
                 alt={shayari.featured_image_alt || 'Shayari featured image'}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
           )}
@@ -131,18 +165,17 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
               </div>
 
             <div className="flex flex-wrap justify-center gap-2 mb-6">
-              {shayari.shayari_language_versions?.map((version, idx) => (
+              {availableTabs.map((tab) => (
                 <button
-                  key={idx}
-                  onClick={() => setSelectedVersionIdx(idx)}
+                  key={tab}
+                  onClick={() => setActiveScriptTab(tab)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedVersionIdx === idx
+                    activeScriptTab === tab
                       ? 'bg-slate-700 text-white shadow-md'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {version.language === 'roman' ? 'Roman Urdu' :
-                   version.language.charAt(0).toUpperCase() + version.language.slice(1)}
+                  {tab === 'roman' ? 'Roman Urdu' : tab === 'hindi' ? 'Hindi' : 'Urdu'}
                 </button>
               ))}
             </div>
@@ -168,13 +201,12 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
           <div className="mb-6 flex flex-col items-center gap-4">
             <div className="flex justify-center">
               <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${
-                currentVersion?.language === 'roman' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                currentVersion?.language === 'urdu' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                currentVersion?.language === 'hindi' ? 'bg-green-100 text-green-700 border-green-200' :
+                activeScriptTab === 'roman' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                activeScriptTab === 'urdu' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                activeScriptTab === 'hindi' ? 'bg-green-100 text-green-700 border-green-200' :
                 'bg-purple-100 text-purple-700 border-purple-200'
               }`}>
-                {currentVersion?.language === 'roman' ? 'Roman Urdu' :
-                 currentVersion?.language.charAt(0).toUpperCase() + currentVersion?.language.slice(1)}
+                {activeScriptTab === 'roman' ? 'Roman Urdu' : activeScriptTab === 'hindi' ? 'Hindi' : 'Urdu'}
               </span>
             </div>
 
@@ -307,7 +339,7 @@ export default function ShayariDetailPage({ shayariId, onNavigate }: ShayariDeta
                 <ShayariCard
                   key={s.id}
                   shayari={s}
-                  onClick={() => onNavigate('shayari', s.id)}
+                  onClick={() => onNavigate('shayari', getShayariUrl(s))}
                 />
               ))}
             </div>

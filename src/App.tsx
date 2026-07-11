@@ -24,6 +24,8 @@ import AboutPage from './pages/AboutPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ChatWidget from './components/ChatWidget';
+import { getShayariUrl } from './utils/shayariUrl';
+import { api } from './services/api';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
 
 const pagePaths: Record<string, string> = {
@@ -73,8 +75,53 @@ function CollectionRoute({ onNavigate }: { onNavigate: (page: string, id?: strin
 }
 
 function ShayariRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
+  const { slug } = useParams();
+  return slug ? <ShayariDetailPage shayariSlug={slug} onNavigate={onNavigate} /> : <ExplorePage onNavigate={onNavigate} />;
+}
+
+function LegacyShayariRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
   const { shayariId } = useParams();
-  return shayariId ? <ShayariDetailPage shayariId={shayariId} onNavigate={onNavigate} /> : <ExplorePage onNavigate={onNavigate} />;
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [fallbackId, setFallbackId] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    async function redirectLegacyUrl() {
+      if (!shayariId) {
+        setNotFound(true);
+        return;
+      }
+
+      try {
+        const shayari = await api.getShayariById(shayariId);
+        const canonicalUrl = getShayariUrl(shayari);
+        if (canonicalUrl === `/shayari/${shayariId}`) {
+          setFallbackId(shayariId);
+          return;
+        }
+
+        setRedirectTo(canonicalUrl);
+      } catch (error) {
+        console.error('Error redirecting legacy shayari URL:', error);
+        setNotFound(true);
+      }
+    }
+
+    redirectLegacyUrl();
+  }, [shayariId]);
+
+  if (redirectTo) return <Navigate to={redirectTo} replace />;
+  if (fallbackId) return <ShayariDetailPage shayariId={fallbackId} onNavigate={onNavigate} />;
+  if (notFound) return <Navigate to="/explore" replace />;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 dark:border-amber-500 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+      </div>
+    </div>
+  );
 }
 
 function EbookRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
@@ -160,7 +207,7 @@ function App() {
     }
 
     if (page === 'shayari' && id) {
-      navigate(`/shayari/${id}`);
+      navigate(id.startsWith('/') ? id : `/shayari/${id}`);
       return;
     }
 
@@ -235,7 +282,8 @@ function App() {
         <Route path="/tags/:tagSlug" element={<TagRoute onNavigate={handleNavigate} />} />
         <Route path="/collections" element={<CollectionsPage onNavigate={handleNavigate} />} />
         <Route path="/collections/:collectionId" element={<CollectionRoute onNavigate={handleNavigate} />} />
-        <Route path="/shayari/:shayariId" element={<ShayariRoute onNavigate={handleNavigate} />} />
+        <Route path="/shayari/:shayariId" element={<LegacyShayariRoute onNavigate={handleNavigate} />} />
+        <Route path="/:year/:month/:day/:slug" element={<ShayariRoute onNavigate={handleNavigate} />} />
         <Route path="/search" element={<SearchPage initialQuery={searchQuery} onNavigate={handleNavigate} />} />
         <Route path="/games" element={<GamesPage />} />
         <Route path="/ebooks" element={<EbooksPage onNavigate={handleNavigate} />} />

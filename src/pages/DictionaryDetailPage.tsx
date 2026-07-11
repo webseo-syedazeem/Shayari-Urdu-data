@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, ArrowRight } from 'lucide-react';
 import { api, DictionaryEntry, Shayari } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface DictionaryDetailPageProps {
   wordId: string;
@@ -238,7 +239,7 @@ export default function DictionaryDetailPage({ wordId, onNavigate }: DictionaryD
                   <div
                     key={shayari.id}
                     className="bg-white rounded-lg shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => onNavigate('shayari', shayari.id)}
+                    onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                   >
                     <p className="text-xl leading-relaxed text-gray-800 mb-4 font-serif">
                       {shayari.text_roman || shayari.text_urdu || shayari.text_english}

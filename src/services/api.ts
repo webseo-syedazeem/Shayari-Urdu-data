@@ -20,6 +20,31 @@ function buildQuery(params: Record<string, any>): string {
   return q.toString() ? `?${q.toString()}` : '';
 }
 
+const urduScriptRegex = /[\u0600-\u06FF]/;
+
+function parseSeoDescriptionVersions(seoDescription?: string | null) {
+  if (!seoDescription) return [];
+
+  const parts = seoDescription
+    .split('\n\n')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const romanLines = parts.filter((part) => !urduScriptRegex.test(part));
+  const urduLines = parts.filter((part) => urduScriptRegex.test(part));
+  const versions: Array<{ language: string; text: string }> = [];
+
+  if (romanLines.length > 0) {
+    versions.push({ language: 'roman_urdu', text: romanLines.join('\n') });
+  }
+
+  if (urduLines.length > 0) {
+    versions.push({ language: 'urdu', text: urduLines.join('\n') });
+  }
+
+  return versions;
+}
+
 export interface Poet {
   id: string;
   name: string;
@@ -158,16 +183,44 @@ class ApiService {
     }
   }
 
-  async getShayari(params?: { page?: number; pageSize?: number; language?: string; form?: string; topic?: string; sort?: 'trending' | 'mostLoved' | 'latest'; poetId?: string; search?: string }) {
-    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize, form: params?.form, topic: params?.topic, sort: params?.sort, poetId: params?.poetId });
+  async getShayari(params?: { page?: number; pageSize?: number; language?: string; form?: string; mood?: string; length?: string; topic?: string; sort?: 'trending' | 'mostLoved' | 'latest'; poetId?: string; search?: string; is_trending?: boolean | null; is_featured?: boolean | null }) {
+    const qs = buildQuery({
+      page: params?.page,
+      pageSize: params?.pageSize,
+      language: params?.language,
+      form: params?.form,
+      mood: params?.mood,
+      length: params?.length,
+      topic: params?.topic,
+      sort: params?.sort,
+      poetId: params?.poetId,
+      q: params?.search,
+      is_trending: params?.is_trending,
+      is_featured: params?.is_featured
+    });
     return apiFetch<{ data: Shayari[]; pagination: any }>(`/api/shayari${qs}`);
   }
 
   async getShayariById(id: string) {
     const data = await apiFetch<any>(`/api/shayari/${encodeURIComponent(id)}`);
+    return this.normalizeShayariDetail(data);
+  }
+
+  async getShayariBySlug(slug: string) {
+    const data = await apiFetch<any>(`/api/shayari/by-slug?slug=${encodeURIComponent(slug)}`);
+    return this.normalizeShayariDetail(data);
+  }
+
+  private normalizeShayariDetail(data: any) {
+    const seoDescriptionVersions = parseSeoDescriptionVersions(data.seo_description);
+    const shayariLanguageVersions = seoDescriptionVersions.length > 0
+      ? seoDescriptionVersions
+      : data.shayari_language_versions || [];
+
     return {
       ...data,
-      languageVersions: data.shayari_language_versions || [],
+      shayari_language_versions: shayariLanguageVersions,
+      languageVersions: shayariLanguageVersions,
       topics: data.topics || [],
       relatedShayari: data.relatedShayari || []
     };

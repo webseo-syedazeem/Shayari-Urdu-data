@@ -8,6 +8,7 @@ import Carousel from '../components/Carousel';
 import { AdSlot } from '../components/ads/AdSlot';
 import { Seo } from '../components/seo/Seo';
 import { api, Shayari, Poet, Topic, Collection } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface HomePageProps {
   onNavigate: (page: string, id?: string) => void;
@@ -116,7 +117,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     <div
                       key={shayari.id}
                       className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/15 transition-all cursor-pointer"
-                      onClick={() => onNavigate('shayari', shayari.id)}
+                      onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                     >
                       <p className="text-lg leading-relaxed mb-3 font-serif line-clamp-2">
                         {firstVersion?.text || 'No text available'}
@@ -147,7 +148,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div key={shayari.id} className="w-80 flex-shrink-0">
                 <ShayariCard
                   shayari={shayari}
-                  onClick={() => onNavigate('shayari', shayari.id)}
+                  onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                 />
               </div>
             ))}
@@ -160,7 +161,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div key={shayari.id} className="w-80 flex-shrink-0">
                 <ShayariCard
                   shayari={shayari}
-                  onClick={() => onNavigate('shayari', shayari.id)}
+                  onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                   showStar={true}
                 />
               </div>

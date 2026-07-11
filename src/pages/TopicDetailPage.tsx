@@ -3,6 +3,7 @@ import * as Icons from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import FilterBar, { FilterState } from '../components/FilterBar';
 import { api, Topic, Shayari } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface TopicDetailPageProps {
   topicSlug: string;
@@ -105,7 +106,7 @@ export default function TopicDetailPage({ topicSlug, onNavigate }: TopicDetailPa
               <ShayariCard
                 key={shayari.id}
                 shayari={shayari}
-                onClick={() => onNavigate('shayari', shayari.id)}
+                onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
               />
             ))}
           </div>

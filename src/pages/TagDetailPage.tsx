@@ -4,6 +4,7 @@ import ShayariCard from '../components/ShayariCard';
 import FilterBar, { FilterState } from '../components/FilterBar';
 import { api, Tag, Shayari } from '../services/api';
 import { Seo } from '../components/seo/Seo';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface TagDetailPageProps {
   tagSlug: string;
@@ -112,7 +113,7 @@ export default function TagDetailPage({ tagSlug, onNavigate }: TagDetailPageProp
               <ShayariCard
                 key={shayari.id}
                 shayari={shayari}
-                onClick={() => onNavigate('shayari', shayari.id)}
+                onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
               />
             ))}
           </div>

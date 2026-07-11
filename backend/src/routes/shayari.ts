@@ -3,15 +3,121 @@ import { supabase } from '../config/database';
 
 const router = Router();
 
+const VALID_LANGUAGES = new Set(['roman_urdu', 'urdu', 'hindi', 'english']);
+const VALID_FORMS = new Set(['sher', 'ghazal', 'nazm', 'qitta', 'quote', 'rubai', 'other']);
+const MOOD_TOPIC_ALIASES: Record<string, string[]> = {
+  love: ['love', 'romantic'],
+  sad: ['sad', 'pain', 'heartbreak', 'sorrow'],
+  motivational: ['motivational', 'hope'],
+  friendship: ['friendship'],
+  life: ['life'],
+  romantic: ['romantic', 'love'],
+  philosophical: ['philosophical', 'philosophy']
+};
+
+function parsePositiveInt(value: unknown, fallback: number, max?: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return max ? Math.min(parsed, max) : parsed;
+}
+
+function emptyListResponse(page: number, pageSize: number) {
+  return { data: [], pagination: { page, pageSize, total: 0, totalPages: 0 } };
+}
+
+function normalizeLanguage(value: unknown) {
+  if (!value) return null;
+  const normalized = String(value).trim().toLowerCase().replace(/[-\s]/g, '_');
+  return VALID_LANGUAGES.has(normalized) ? normalized : null;
+}
+
+function normalizeForm(value: unknown) {
+  if (!value) return null;
+  const normalized = String(value).trim().toLowerCase();
+  return VALID_FORMS.has(normalized) ? normalized : null;
+}
+
+async function resolveTopicIds(value: unknown, aliases: Record<string, string[]> = {}) {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  const normalized = raw.toLowerCase().replace(/_/g, '-');
+  const candidates = new Set([normalized, ...(aliases[normalized] || [])]);
+
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) {
+    return [raw];
+  }
+
+  const { data, error } = await supabase.from('topics').select('id, name, slug');
+  if (error) throw error;
+
+  return (data || [])
+    .filter((topic: any) => {
+      const slug = String(topic.slug || '').toLowerCase();
+      const name = String(topic.name || '').trim().toLowerCase().replace(/\s+/g, '-');
+      return candidates.has(slug) || candidates.has(name);
+    })
+    .map((topic: any) => topic.id);
+}
+
+async function getShayariDetail(column: 'id' | 'slug', value: string) {
+  const { data: shayari, error: shayariError } = await supabase.from('shayari').select(`*, poets(*)`).eq(column, value).maybeSingle();
+  if (shayariError) throw shayariError;
+  if (!shayari) return null;
+
+  const { data: languageVersions } = await supabase.from('shayari_language_versions').select('*').eq('shayari_id', shayari.id);
+  const { data: topics } = await supabase.from('shayari_topics').select('topics(*)').eq('shayari_id', shayari.id);
+  const { data: tags } = await supabase.from('shayari_tags').select('tags(*)').eq('shayari_id', shayari.id);
+  const { data: relatedShayari } = await supabase.from('shayari').select(`*, poets(name, slug, avatar_url), shayari_language_versions(language, text)`).eq('poet_id', shayari.poet_id).neq('id', shayari.id).limit(6);
+
+  return {
+    ...shayari,
+    shayari_language_versions: languageVersions,
+    topics: (topics || []).map((t: any) => t.topics).filter(Boolean),
+    tags: (tags || []).map((t: any) => t.tags).filter(Boolean),
+    relatedShayari
+  };
+}
+
 router.get('/', async (req, res) => {
   try {
-    const { page = '1', pageSize = '20', form, topic, sort = 'latest', poetId, q } = req.query;
-    const offset = (Number(page) - 1) * Number(pageSize);
+    const { form, language, topic, mood, sort = 'latest', poetId, q, is_trending, is_featured } = req.query;
+    const page = parsePositiveInt(req.query.page, 1);
+    const pageSize = parsePositiveInt(req.query.pageSize, 20, 100);
+    const offset = (page - 1) * pageSize;
+    const normalizedLanguage = normalizeLanguage(language);
+    const normalizedForm = normalizeForm(form);
+    const topicIds = topic ? await resolveTopicIds(topic) : null;
+    const moodTopicIds = mood ? await resolveTopicIds(mood, MOOD_TOPIC_ALIASES) : null;
 
-    let query = supabase.from('shayari').select(`*, poets(name, slug, avatar_url), shayari_language_versions(language, text)`, { count: 'exact' });
+    if (language && !normalizedLanguage) {
+      return res.status(400).json({ error: 'Invalid language filter' });
+    }
+
+    if (form && !normalizedForm) {
+      return res.status(400).json({ error: 'Invalid form filter' });
+    }
+
+    if ((topic && topicIds?.length === 0) || (mood && moodTopicIds?.length === 0)) {
+      return res.json(emptyListResponse(page, pageSize));
+    }
+
+    const languageSelect = normalizedLanguage
+      ? 'shayari_language_versions!inner(language, text)'
+      : 'shayari_language_versions(language, text)';
+    const topicSelect = topic || mood ? ', shayari_topics!inner(topic_id)' : '';
+
+    let query = supabase
+      .from('shayari')
+      .select(`*, poets(name, slug, avatar_url), ${languageSelect}${topicSelect}`, { count: 'exact' });
 
     if (poetId) query = query.eq('poet_id', poetId);
-    if (form) query = query.eq('form', form);
+    if (normalizedForm) query = query.eq('form', normalizedForm);
+    if (is_trending !== undefined) query = query.eq('is_trending', String(is_trending) === 'true');
+    if (is_featured !== undefined) query = query.eq('is_featured', String(is_featured) === 'true');
+    if (normalizedLanguage) query = query.eq('shayari_language_versions.language', normalizedLanguage);
+    if (topicIds?.length) query = query.in('shayari_topics.topic_id', topicIds);
+    if (moodTopicIds?.length) query = query.in('shayari_topics.topic_id', moodTopicIds);
     if (q) {
       const searchTerm = String(q).trim();
       if (searchTerm) {
@@ -32,27 +138,37 @@ router.get('/', async (req, res) => {
         }
       }
     }
-    if (topic) {
-      const { data: topicShayari } = await supabase.from('shayari_topics').select('shayari_id').eq('topic_id', topic);
-      const ids = (topicShayari || []).map((s: any) => s.shayari_id);
-      if (ids.length === 0) return res.json({ data: [], pagination: { page: Number(page), pageSize: Number(pageSize), total: 0, totalPages: 0 } });
-      query = query.in('id', ids);
-    }
-
     switch (sort) {
       case 'trending': query = query.eq('is_trending', true).order('popularity_score', { ascending: false }); break;
       case 'mostLoved': query = query.order('popularity_score', { ascending: false }); break;
       default: query = query.order('created_at', { ascending: false }); break;
     }
 
-    query = query.range(offset, offset + Number(pageSize) - 1);
+    query = query.range(offset, offset + pageSize - 1);
 
     const { data, error, count } = await query;
     if (error) throw error;
 
-    res.json({ data, pagination: { page: Number(page), pageSize: Number(pageSize), total: count || 0, totalPages: Math.ceil((count || 0) / Number(pageSize)) } });
+    res.json({ data, pagination: { page, pageSize, total: count || 0, totalPages: Math.ceil((count || 0) / pageSize) } });
   } catch (error) {
     console.error('Error fetching shayari:', error);
+    res.status(500).json({ error: 'Failed to fetch shayari' });
+  }
+});
+
+router.get('/by-slug', async (req, res) => {
+  try {
+    const { slug } = req.query;
+    if (!slug || typeof slug !== 'string') {
+      return res.status(400).json({ error: 'Slug is required' });
+    }
+
+    const shayari = await getShayariDetail('slug', slug);
+    if (!shayari) return res.status(404).json({ error: 'Shayari not found' });
+
+    res.json(shayari);
+  } catch (error) {
+    console.error('Error fetching shayari by slug:', error);
     res.status(500).json({ error: 'Failed to fetch shayari' });
   }
 });
@@ -61,22 +177,10 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: shayari, error: shayariError } = await supabase.from('shayari').select(`*, poets(*)`).eq('id', id).single();
-    if (shayariError) throw shayariError;
+    const shayari = await getShayariDetail('id', id);
     if (!shayari) return res.status(404).json({ error: 'Shayari not found' });
 
-    const { data: languageVersions } = await supabase.from('shayari_language_versions').select('*').eq('shayari_id', id);
-    const { data: topics } = await supabase.from('shayari_topics').select('topics(*)').eq('shayari_id', id);
-    const { data: tags } = await supabase.from('shayari_tags').select('tags(*)').eq('shayari_id', id);
-    const { data: relatedShayari } = await supabase.from('shayari').select(`*, poets(name, slug, avatar_url), shayari_language_versions(language, text)`).eq('poet_id', shayari.poet_id).neq('id', id).limit(6);
-
-    res.json({
-      ...shayari,
-      shayari_language_versions: languageVersions,
-      topics: (topics || []).map((t: any) => t.topics).filter(Boolean),
-      tags: (tags || []).map((t: any) => t.tags).filter(Boolean),
-      relatedShayari
-    });
+    res.json(shayari);
   } catch (error) {
     console.error('Error fetching shayari:', error);
     res.status(500).json({ error: 'Failed to fetch shayari' });

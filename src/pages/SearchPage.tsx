@@ -5,6 +5,7 @@ import PoetCard from '../components/PoetCard';
 import TopicCard from '../components/TopicCard';
 import CollectionCard from '../components/CollectionCard';
 import { api, Shayari, Poet, Topic, Collection } from '../services/api';
+import { getShayariUrl } from '../utils/shayariUrl';
 
 interface SearchPageProps {
   initialQuery?: string;
@@ -148,7 +149,7 @@ export default function SearchPage({ initialQuery = '', onNavigate }: SearchPage
                         <ShayariCard
                           key={shayari.id}
                           shayari={shayari}
-                          onClick={() => onNavigate('shayari', shayari.id)}
+                          onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
                         />
                       ))}
                     </div>
