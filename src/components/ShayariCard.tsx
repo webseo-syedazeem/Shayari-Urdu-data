@@ -1,6 +1,8 @@
 import { Heart, Bookmark, Share2 } from 'lucide-react';
 import { Shayari } from '../services/api';
 
+const FALLBACK_IMAGE = '/images/shayari-image-not-found.svg';
+
 interface ShayariCardProps {
   shayari: Shayari;
   onClick?: () => void;
@@ -24,38 +26,45 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
   };
 
   const getLanguageLabel = (lang: string) => {
-    if (lang === 'roman') return 'Roman Urdu';
-    return lang.charAt(0).toUpperCase() + lang.slice(1);
+    if (lang === 'roman' || lang === 'roman_urdu') return 'Roman Urdu';
+    return lang
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       {showStar && (
         <div className="absolute -top-3 -right-3 z-10 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
           <span className="text-white text-xl">⭐</span>
         </div>
       )}
       <div
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1 relative overflow-hidden"
+        className="h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1 relative overflow-hidden flex flex-col"
         onClick={onClick}
       >
-        {shayari.featured_image_url && (
-          <div className="w-full h-48 overflow-hidden">
-            <img
-              src={shayari.featured_image_url}
-              alt={shayari.featured_image_alt || 'Shayari featured image'}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
-        <div className="p-6">
-          <div className="mb-4">
+        <div className="w-full h-48 shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-700">
+          <img
+            src={shayari.featured_image_url || FALLBACK_IMAGE}
+            alt={shayari.featured_image_alt || 'Shayari image not available'}
+            className="w-full h-full object-cover"
+            onError={(event) => {
+              if (!event.currentTarget.src.endsWith(FALLBACK_IMAGE)) {
+                event.currentTarget.src = FALLBACK_IMAGE;
+              }
+            }}
+          />
+        </div>
+        <div className="p-6 flex flex-col flex-1">
+          <div className="mb-4 min-h-[5.25rem]">
             <p className="text-lg leading-relaxed text-gray-800 dark:text-gray-200 line-clamp-3 font-serif">
               {text}
             </p>
           </div>
 
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 min-h-8">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-br from-slate-700 to-slate-500 rounded-full flex items-center justify-center">
               <span className="text-white text-xs font-semibold">
@@ -83,7 +92,7 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
           )}
         </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-700">
+          <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-100 dark:border-slate-700">
             <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
               <button className="flex items-center space-x-1 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                 <Heart size={16} />

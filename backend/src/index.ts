@@ -13,12 +13,14 @@ import adSlotsRouter from './routes/adSlots';
 import authRouter from './routes/auth';
 import uploadRouter from './routes/upload';
 import importWordPressRouter from './routes/importWordPress';
+import importWordPressRawRouter from './routes/importWordPressRaw';
 import chatRouter from './routes/chat';
+import aiImageSettingsRouter from './routes/aiImageSettings';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
 app.use(cors({ origin: corsOrigin }));
@@ -39,7 +41,9 @@ app.use('/api/ebooks', ebooksRouter);
 app.use('/api/dictionary', dictionaryRouter);
 app.use('/api/ad-slots', adSlotsRouter);
 app.use('/api/import/wordpress', importWordPressRouter);
+app.use('/api/import/wordpress-raw', importWordPressRawRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/ai-image-settings', aiImageSettingsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

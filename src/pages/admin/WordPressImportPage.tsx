@@ -15,13 +15,20 @@ interface ImportProgress {
   lastPostId: number;
 }
 
+const emptyProgress = (): ImportProgress => ({
+  totalFetched: 0,
+  imported: 0,
+  skipped: 0,
+  errors: [],
+  currentPage: 0,
+  lastPostId: 0,
+});
+
 export default function WordPressImportPage({ onNavigate }: WordPressImportPageProps) {
   const [wordpressUrl, setWordpressUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const [progress, setProgress] = useState<ImportProgress>({
-    totalFetched: 0, imported: 0, skipped: 0, errors: [], currentPage: 0, lastPostId: 0,
-  });
+  const [progress, setProgress] = useState<ImportProgress>(emptyProgress);
   const [completed, setCompleted] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -36,14 +43,14 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
     setCompleted(false);
     setImportError(null);
     setStatusMessage('Connecting...');
-    setProgress({ totalFetched: 0, imported: 0, skipped: 0, errors: [], currentPage: 0, lastPostId: 0 });
+    setProgress(emptyProgress());
 
     const token = localStorage.getItem('adminAccessToken');
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/import/wordpress`, {
+      const response = await fetch(API_BASE_URL + '/api/import/wordpress', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,23 +85,25 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
               setStatusMessage(data.message ?? '');
             } else if (data.type === 'progress') {
               setStatusMessage(data.message ?? '');
-              setProgress({
+              setProgress(prev => ({
+                ...prev,
                 totalFetched: data.totalFetched ?? 0,
                 imported: data.imported ?? 0,
                 skipped: data.skipped ?? 0,
                 errors: data.errors ?? [],
                 currentPage: data.currentPage ?? 0,
                 lastPostId: data.lastPostId ?? 0,
-              });
+              }));
             } else if (data.type === 'complete') {
-              setProgress({
+              setProgress(prev => ({
+                ...prev,
                 totalFetched: data.totalFetched ?? 0,
                 imported: data.imported ?? 0,
                 skipped: data.skipped ?? 0,
                 errors: data.errors ?? [],
                 currentPage: data.currentPage ?? 0,
                 lastPostId: data.lastPostId ?? 0,
-              });
+              }));
               setStatusMessage('');
               setCompleted(true);
             } else if (data.type === 'error') {
@@ -160,7 +169,7 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
               disabled={importing || !wordpressUrl.trim()}
               className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
             >
-              {importing ? 'Importing...' : 'Start Import'}
+              {importing ? 'Importing...' : 'Start Shayari Import'}
             </button>
 
             {importing && (
@@ -185,7 +194,9 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
                 {progress.currentPage > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-300">Current Page:</span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">{progress.currentPage}</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {progress.currentPage}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between">

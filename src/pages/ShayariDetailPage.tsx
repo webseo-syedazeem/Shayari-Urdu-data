@@ -4,6 +4,8 @@ import ShayariCard from '../components/ShayariCard';
 import { api, Shayari } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
 
+const FALLBACK_IMAGE = '/images/shayari-image-not-found.svg';
+
 function parseShayariText(seoDescription: string) {
   const lines = seoDescription.split('\n').map(l => l.trim()).filter(Boolean);
   const urduRegex = /[\u0600-\u06FF]/;
@@ -146,15 +148,18 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
-          {shayari.featured_image_url && (
-            <div className="w-auto md:h-auto overflow-hidden">
-              <img
-                src={shayari.featured_image_url}
-                alt={shayari.featured_image_alt || 'Shayari featured image'}
-                className="w-full h-full object-contain"
-              />
-            </div>
-          )}
+          <div className="w-full h-64 md:h-[28rem] overflow-hidden bg-slate-100">
+            <img
+              src={shayari.featured_image_url || FALLBACK_IMAGE}
+              alt={shayari.featured_image_alt || 'Shayari image not available'}
+              className="w-full h-full object-contain"
+              onError={(event) => {
+                if (!event.currentTarget.src.endsWith(FALLBACK_IMAGE)) {
+                  event.currentTarget.src = FALLBACK_IMAGE;
+                }
+              }}
+            />
+          </div>
           <div className="p-8 md:p-12">
             <div className="text-center mb-8">
               <div
@@ -182,7 +187,7 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
 
             {poet && (
               <button
-                onClick={() => onNavigate('poet', poet.id)}
+                onClick={() => onNavigate('poet', poet.slug)}
                 className="inline-flex items-center space-x-3 hover:opacity-80 transition-opacity"
               >
                 <img

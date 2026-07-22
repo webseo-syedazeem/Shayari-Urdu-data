@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { supabase } from '../config/database';
 
 const router = Router();
@@ -90,29 +91,41 @@ function extractContent(post: WPPost): string {
   return post.content?.rendered || '';
 }
 
+function detectLanguage(text: string): 'urdu' | 'hindi' | 'roman_urdu' {
+  if (/[\u0600-\u06FF]/.test(text)) return 'urdu';   // Arabic/Urdu script
+  if (/[\u0900-\u097F]/.test(text)) return 'hindi';  // Devanagari/Hindi
+  return 'roman_urdu';
+}
+
+function cleanBlock(inner: string): string {
+  let t = inner.replace(/<br\s*\/?>/gi, '\n');
+  t = t.replace(/<[^>]+>/g, '');
+  t = decodeHtmlEntities(t);
+  t = t.replace(/\u00a0/g, ' ');
+  t = t.replace(/[ \t]+/g, ' ');
+  return t.split('\n').map(line => line.trim()).filter(Boolean).join('\n').trim();
+}
+
 function extractLanguageVersions(content: string) {
-  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-  if (lines.length === 0) return { roman: '', urdu: '', hindi: '' };
+  const groups: Record<'urdu' | 'hindi' | 'roman_urdu', string[]> = {
+    urdu: [], hindi: [], roman_urdu: [],
+  };
+  const blockRe = /<(h[1-6]|p)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match: RegExpExecArray | null;
 
-  const romanLines: string[] = [];
-  const urduLines: string[]  = [];
-  const hindiLines: string[] = [];
-
-  for (const line of lines) {
-    if (/[؀-ۿ]/.test(line)) {
-      urduLines.push(line);          // Arabic/Urdu script
-    } else if (/[ऀ-ॿ]/.test(line)) {
-      hindiLines.push(line);         // Devanagari/Hindi script
-    } else {
-      romanLines.push(line);         // Latin/Roman Urdu
-    }
+  while ((match = blockRe.exec(content)) !== null) {
+    const text = cleanBlock(match[2]);
+    if (text.length < 3) continue;
+    groups[detectLanguage(text)].push(text);
   }
 
-  return {
-    roman: romanLines.join('\n'),
-    urdu:  urduLines.join('\n'),
-    hindi: hindiLines.join('\n'),
-  };
+  const versions: { language: 'urdu' | 'hindi' | 'roman_urdu'; text: string }[] = [];
+  (['roman_urdu', 'urdu', 'hindi'] as const).forEach(language => {
+    if (groups[language].length) {
+      versions.push({ language, text: groups[language].join('\n') });
+    }
+  });
+  return versions;
 }
 
 async function wpFetch(url: string, retries = 5): Promise<any> {
@@ -155,6 +168,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   const limit = 0; // import all
+  const diagnosticLimit = Math.max(0, Number(process.env.WORDPRESS_IMPORT_DIAGNOSTIC_LIMIT) || 0);
 
   // SSE setup
   res.setHeader('Content-Type', 'text/event-stream');
@@ -268,10 +282,33 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
     send({ type: 'status', message: `Tags done (${tagMap.size}). Starting posts...` });
+    const linkTags = async (shayariId: string, wordpressTagIds: number[]) => {
+      const rows = wordpressTagIds.flatMap(tagId => {
+        const tagUuid = tagMap.get(tagId);
+        return tagUuid
+          ? [{ id: randomUUID(), shayari_id: shayariId, tag_id: tagUuid }]
+          : [];
+      });
+
+      if (rows.length === 0) return;
+
+      const { error } = await supabase
+        .from('shayari_tags')
+        .upsert(rows, {
+          onConflict: 'shayari_id,tag_id',
+          ignoreDuplicates: true,
+        });
+
+      if (error) {
+        throw new Error('Tag linking failed: ' + error.message);
+      }
+    };
+
 
     // ---- POSTS ----
     let postPage = startPage;
     let totalImported = 0;
+    let diagnosticPostCount = 0;
 
     if (startPage > 1) {
       send({ type: 'status', message: `Resuming from page ${startPage}...` });
@@ -302,14 +339,34 @@ router.post('/', async (req: Request, res: Response) => {
 
           // duplicate check
           const { data: byWpId } = await supabase.from('shayari').select('id').eq('wordpress_post_id', post.id).maybeSingle();
-          if (byWpId) { progress.skipped++; continue; }
+          if (byWpId) {
+            await linkTags(byWpId.id, post.tags || []);
+            progress.skipped++;
+            continue;
+          }
           const { data: bySlug } = await supabase.from('shayari').select('id').eq('slug', post.slug).maybeSingle();
           if (bySlug) { progress.skipped++; continue; }
 
-          const content = stripHtml(contentRaw);
-          const languages = extractLanguageVersions(content);
+          if (diagnosticLimit > 0 && diagnosticPostCount >= diagnosticLimit) break outer;
 
-          if (!languages.roman && !languages.urdu && !languages.hindi) { progress.skipped++; continue; }
+          const content = stripHtml(contentRaw);
+          const languages = extractLanguageVersions(contentRaw);
+          diagnosticPostCount++;
+
+          if (diagnosticPostCount <= 3) {
+            console.log('[WP Import debug] Post ' + post.id + ' languages.length:', languages.length);
+          }
+          if (diagnosticPostCount === 1) {
+            console.log('[WP Import debug] First post ' + post.id + ' contentRaw:', contentRaw);
+          }
+
+          if (languages.length === 0) {
+            if (diagnosticPostCount === 1) {
+              console.log('[WP Import debug] First post ' + post.id + ' langInserts:', []);
+            }
+            progress.skipped++;
+            continue;
+          }
 
           const seoTitle = cleanSeoTitle(post.yoast_head_json?.title || title);
           const seoDesc = (post.yoast_head_json?.description || content.slice(0, 160)).trim() || null;
@@ -358,23 +415,50 @@ router.post('/', async (req: Request, res: Response) => {
             continue;
           }
 
-          const langInserts: { shayari_id: string; language: string; text: string }[] = [];
-          if (languages.roman) langInserts.push({ shayari_id: shayari.id, language: 'roman_urdu', text: languages.roman });
-          if (languages.urdu) langInserts.push({ shayari_id: shayari.id, language: 'urdu', text: languages.urdu });
-          if (languages.hindi) langInserts.push({ shayari_id: shayari.id, language: 'hindi', text: languages.hindi });
+          const langInserts = languages.map(({ language, text }) => ({
+            shayari_id: shayari.id,
+            language,
+            text,
+          }));
 
-          if (langInserts.length > 0)
-            await supabase.from('shayari_language_versions').insert(langInserts);
+          if (diagnosticPostCount === 1) {
+            console.log('[WP Import debug] First post ' + post.id + ' langInserts:', langInserts);
+          }
+
+          const { data: insertedLanguages, error: languageError } = await supabase
+            .from('shayari_language_versions')
+            .insert(langInserts)
+            .select('id');
+
+          if (languageError) {
+            console.error('[WP Import] Language insert failed for post ' + post.id + ':', {
+              message: languageError.message,
+              details: languageError.details,
+              hint: languageError.hint,
+              code: languageError.code,
+            });
+            if (progress.errors.length < 50) {
+              progress.errors.push('Post ' + post.id + ' (' + post.slug + ') language insert: ' + languageError.message);
+            }
+            send({ type: 'progress', ...progress });
+            continue;
+          }
+
+          if (!insertedLanguages || insertedLanguages.length === 0) {
+            console.error('[WP Import] Language insert returned zero rows for post ' + post.id);
+            if (progress.errors.length < 50) {
+              progress.errors.push('Post ' + post.id + ' (' + post.slug + ') language insert returned zero rows');
+            }
+            send({ type: 'progress', ...progress });
+            continue;
+          }
 
           for (const catId of (post.categories || [])) {
             const topicId = categoryMap.get(catId);
             if (topicId) await supabase.from('shayari_topics').insert({ shayari_id: shayari.id, topic_id: topicId }).then(() => {});
           }
 
-          for (const tagId of (post.tags || [])) {
-            const tagUuid = tagMap.get(tagId);
-            if (tagUuid) await supabase.from('shayari_tags').insert({ shayari_id: shayari.id, tag_id: tagUuid }).then(() => {});
-          }
+          await linkTags(shayari.id, post.tags || []);
 
           progress.imported++;
           progress.lastPostId = post.id;

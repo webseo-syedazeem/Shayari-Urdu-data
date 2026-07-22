@@ -191,7 +191,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <PoetCard
                 key={poet.id}
                 poet={poet}
-                onClick={() => onNavigate('poet', poet.id)}
+                onClick={() => onNavigate('poet', poet.slug)}
               />
             ))}
           </div>

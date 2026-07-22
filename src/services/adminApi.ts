@@ -14,6 +14,19 @@ async function adminFetch<T = any>(path: string, options?: RequestInit): Promise
       ...options?.headers
     }
   });
+
+  if (response.status === 401) {
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminAccessToken');
+    localStorage.removeItem('adminRefreshToken');
+
+    if (window.location.pathname !== '/admin-login') {
+      window.location.replace('/admin-login');
+    }
+
+    throw new Error('Your admin session has expired. Please log in again.');
+  }
+
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
     throw new Error(err.error || err.message || `HTTP ${response.status}`);
@@ -23,6 +36,9 @@ async function adminFetch<T = any>(path: string, options?: RequestInit): Promise
 
 export const adminApi = {
   get: async <T = any>(endpoint: string): Promise<T> => {
+    if (endpoint === '/ai-image-settings') {
+      return adminFetch<T>('/api/ai-image-settings');
+    }
     // Map admin endpoints to backend API paths
     if (endpoint.startsWith('/poets')) {
       const parts = endpoint.split('/').filter(Boolean);
@@ -93,6 +109,9 @@ export const adminApi = {
   },
 
   put: async <T = any>(endpoint: string, body: any): Promise<T> => {
+    if (endpoint === '/ai-image-settings') {
+      return adminFetch<T>('/api/ai-image-settings', { method: 'PUT', body: JSON.stringify(body) });
+    }
     const parts = endpoint.split('/').filter(Boolean);
     const resource = parts[0];
     const id = parts[1];
@@ -174,22 +193,25 @@ export const adminApi = {
     });
   },
 
-  searchShayari: async (options: { query?: string; form?: string; poetId?: string; language?: string; page?: number; pageSize?: number }) => {
-    const { query, form, poetId, language, page = 1, pageSize = 20 } = options;
+  searchShayari: async (options: { query?: string; form?: string; poetId?: string; language?: string; page?: number; pageSize?: number; batchOffset?: number; fresh?: boolean; searchAll?: boolean }) => {
+    const { query, form, poetId, language, page = 1, pageSize = 20, batchOffset, fresh = false, searchAll = false } = options;
     const qs = new URLSearchParams();
-    qs.set('page', String(page));
-    qs.set('pageSize', String(pageSize));
+    if (searchAll) {
+      qs.set('searchAll', 'true');
+    } else {
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+    }
     if (query && query.trim()) qs.set('q', query.trim());
     if (form && form !== 'all') qs.set('form', form);
     if (poetId && poetId !== 'all') qs.set('poetId', poetId);
+    if (language && language !== 'all') qs.set('language', language);
 
-    const result = await adminFetch<{ data: any[]; pagination: any }>(`/api/shayari?${qs.toString()}`);
-    let results = result.data || [];
+    const result = await adminFetch<{ data: any[]; pagination: any }>(`/api/shayari?${qs.toString()}`, {
+      cache: fresh ? 'no-store' : 'default',
+      headers: batchOffset !== undefined ? { 'X-Batch-Offset': String(batchOffset) } : undefined
+    });
 
-    if (language && language !== 'all') {
-      results = results.filter((s: any) => s.shayari_language_versions?.some((v: any) => v.language === language));
-    }
-
-    return { data: results, total: result.pagination?.total || 0 };
+    return { data: result.data || [], total: result.pagination?.total || 0 };
   }
 };

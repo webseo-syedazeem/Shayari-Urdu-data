@@ -166,7 +166,7 @@ export default function SearchPage({ initialQuery = '', onNavigate }: SearchPage
                         <PoetCard
                           key={poet.id}
                           poet={poet}
-                          onClick={() => onNavigate('poet', poet.id)}
+                          onClick={() => onNavigate('poet', poet.slug)}
                         />
                       ))}
                     </div>

@@ -55,8 +55,8 @@ const getCurrentPage = (pathname: string) => {
 };
 
 function PoetRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
-  const { poetId } = useParams();
-  return poetId ? <PoetDetailPage poetId={poetId} onNavigate={onNavigate} /> : <PoetsPage onNavigate={onNavigate} />;
+  const { poetSlug } = useParams();
+  return poetSlug ? <PoetDetailPage poetSlug={poetSlug} onNavigate={onNavigate} /> : <PoetsPage onNavigate={onNavigate} />;
 }
 
 function TopicRoute({ onNavigate }: { onNavigate: (page: string, id?: string) => void }) {
@@ -275,7 +275,7 @@ function App() {
         <Route path="/" element={<HomePage onNavigate={handleNavigate} />} />
         <Route path="/explore" element={<ExplorePage onNavigate={handleNavigate} />} />
         <Route path="/poets" element={<PoetsPage onNavigate={handleNavigate} />} />
-        <Route path="/poets/:poetId" element={<PoetRoute onNavigate={handleNavigate} />} />
+        <Route path="/poets/:poetSlug" element={<PoetRoute onNavigate={handleNavigate} />} />
         <Route path="/topics" element={<TopicsPage onNavigate={handleNavigate} />} />
         <Route path="/topics/:topicSlug" element={<TopicRoute onNavigate={handleNavigate} />} />
         <Route path="/tags" element={<TagsPage onNavigate={handleNavigate} />} />

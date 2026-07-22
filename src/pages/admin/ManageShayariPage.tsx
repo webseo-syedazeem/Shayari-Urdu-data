@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, X, Upload } from 'lucide-react';
-import { api } from '../../services/api';
+import { Plus, Edit, Trash2, Search, X, Upload, Sparkles, Loader2 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { uploadImage } from '../../services/uploadService';
-import { generateShayariSlug, makeSlugUnique } from '../../utils/slugUtils';
+import { generateShayariImage } from '../../services/imageGenerationService';
+import { generateShayariSlug } from '../../utils/slugUtils';
 import SeoSettingsSection from '../../components/admin/SeoSettingsSection';
+
+const FETCH_CHUNK = 1000;
 
 interface ShayariFormData {
   slug: string;
@@ -58,6 +60,8 @@ export default function ManageShayariPage() {
   const [success, setSuccess] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
   const [newTagName, setNewTagName] = useState('');
   const [addingTopic, setAddingTopic] = useState(false);
@@ -67,7 +71,8 @@ export default function ManageShayariPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [loadLimit, setLoadLimit] = useState(100);
   const [loadLimitInput, setLoadLimitInput] = useState('100');
-  const FETCH_CHUNK = 1000; // max rows Supabase returns per request
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; requested: number } | null>(null);
+  const [bulkLoaded, setBulkLoaded] = useState(false);
 
   useEffect(() => {
     loadShayari(1, '', 100);
@@ -80,46 +85,74 @@ export default function ManageShayariPage() {
     try {
       setLoading(true);
       setError('');
-
-      if (query.trim()) {
-        // Search: paginated with `limit` per page, server searches all records
-        const result = await adminApi.searchShayari({ query, page: displayPage, pageSize: limit });
-        setShayari(result.data || []);
-        setTotalRecords(result.total);
-        setCurrentPage(displayPage);
-      } else if (limit <= FETCH_CHUNK) {
-        // No search, small page size: single backend request
-        const result = await adminApi.searchShayari({ query: '', page: displayPage, pageSize: limit });
-        setShayari(result.data || []);
-        setTotalRecords(result.total);
-        setCurrentPage(displayPage);
-      } else {
-        // No search, large page size (>1000): chunk-fetch the correct window
-        // startRecord is 0-indexed position of the first record on this display page
-        const startRecord = (displayPage - 1) * limit;
-        const backendStartPage = Math.floor(startRecord / FETCH_CHUNK) + 1;
-        const numChunks = Math.ceil(limit / FETCH_CHUNK);
-
-        let allChunks: any[] = [];
-        let total = 0;
-
-        for (let i = 0; i < numChunks; i++) {
-          const result = await adminApi.searchShayari({ query: '', page: backendStartPage + i, pageSize: FETCH_CHUNK });
-          total = result.total;
-          const rows = result.data || [];
-          allChunks = allChunks.concat(rows);
-          if (rows.length < FETCH_CHUNK) break;
-        }
-
-        // Trim to exact window: skip the partial overlap at the start of the first chunk
-        const localStart = startRecord % FETCH_CHUNK;
-        setShayari(allChunks.slice(localStart, localStart + limit));
-        setTotalRecords(total);
-        setCurrentPage(displayPage);
-      }
-    } catch (error) {
+      setLoadProgress(null);
+      setBulkLoaded(false);
+      const pageSize = Math.min(limit, FETCH_CHUNK);
+      const result = await adminApi.searchShayari({ query, page: displayPage, pageSize });
+      setShayari(result.data || []);
+      setTotalRecords(result.total);
+      setCurrentPage(displayPage);
+    } catch (error: any) {
       console.error('Error loading shayari:', error);
-      setError('Failed to load shayari');
+      setError(error.message || 'Failed to load shayari');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRequestedShayari = async (requestedTotal: number, query = '') => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setBulkLoaded(true);
+    setCurrentPage(1);
+    setLoadProgress({ loaded: 0, requested: requestedTotal });
+
+    const rowsById = new Map<string, any>();
+    let total = 0;
+    let effectiveRequestedTotal = requestedTotal;
+    const totalRequests = Math.ceil(requestedTotal / FETCH_CHUNK);
+
+    try {
+      for (let requestIndex = 0; requestIndex < totalRequests; requestIndex++) {
+        const page = requestIndex + 1;
+        const batchOffset = requestIndex * FETCH_CHUNK;
+        const pageSize = Math.min(FETCH_CHUNK, requestedTotal - batchOffset);
+
+        try {
+          const result = await adminApi.searchShayari({
+            query,
+            page,
+            pageSize,
+            batchOffset,
+            fresh: true
+          });
+          total = result.total;
+          effectiveRequestedTotal = Math.min(requestedTotal, total);
+          const batchRows = result.data || [];
+
+          for (const row of batchRows) {
+            if (row?.id !== undefined && row?.id !== null) rowsById.set(String(row.id), row);
+          }
+          setLoadProgress({ loaded: rowsById.size, requested: effectiveRequestedTotal });
+
+          if (
+            rowsById.size >= effectiveRequestedTotal ||
+            batchRows.length < pageSize
+          ) {
+            break;
+          }
+        } catch (batchError: any) {
+          throw new Error(`Failed to load page ${page}: ${batchError.message || 'Unknown error'}`);
+        }
+      }
+
+      setShayari(Array.from(rowsById.values()).slice(0, effectiveRequestedTotal));
+      setTotalRecords(total);
+    } catch (error: any) {
+      console.error('Error bulk loading shayari:', error);
+      setShayari([]);
+      setError(error.message || 'Failed to load shayari');
     } finally {
       setLoading(false);
     }
@@ -129,7 +162,40 @@ export default function ManageShayariPage() {
     const n = Math.max(1, parseInt(loadLimitInput) || 100);
     setLoadLimit(n);
     setLoadLimitInput(String(n));
-    loadShayari(1, searchQuery, n);
+    loadRequestedShayari(n, searchQuery);
+  };
+
+  const searchEntireDatabase = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      loadRequestedShayari(loadLimit, '');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setLoadProgress(null);
+      setBulkLoaded(true);
+      setCurrentPage(1);
+
+      const result = await adminApi.searchShayari({
+        query,
+        searchAll: true,
+        fresh: true
+      });
+
+      setShayari(result.data || []);
+      setTotalRecords(result.total);
+    } catch (searchError: any) {
+      console.error('Error searching shayari:', searchError);
+      setShayari([]);
+      setTotalRecords(0);
+      setError(searchError.message || 'Failed to search shayari');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadPoets = async () => {
@@ -181,6 +247,8 @@ export default function ManageShayariPage() {
     });
     setSelectedFile(null);
     setPreviewUrl('');
+    setImagePrompt('');
+    setGeneratingImage(false);
     setNewTopicName('');
     setNewTagName('');
     setDebugInfo('');
@@ -243,6 +311,8 @@ export default function ManageShayariPage() {
       });
       setSelectedFile(null);
       setPreviewUrl(data.featured_image_url || '');
+      setImagePrompt('');
+      setGeneratingImage(false);
       setNewTopicName('');
       setNewTagName('');
       setDebugInfo(`Loaded: ${topic_ids.length} topics, ${tag_ids.length} tags`);
@@ -252,6 +322,42 @@ export default function ManageShayariPage() {
     } catch (error: any) {
       console.error('Error loading shayari details:', error);
       setError(error.message || 'Failed to load shayari details');
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!editingId) {
+      setError('Save the shayari first, then generate its image.');
+      return;
+    }
+    if (!imagePrompt.trim()) {
+      setError('Please enter an image prompt.');
+      return;
+    }
+
+    setGeneratingImage(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await generateShayariImage(editingId, imagePrompt);
+      setFormData((current) => ({
+        ...current,
+        featured_image_url: result.public_url
+      }));
+      setSelectedFile(null);
+      setPreviewUrl(result.public_url);
+      setSuccess(
+        `Image generated and saved using ${result.model} (${result.quality}, ${result.image_format.toUpperCase()}, settings: ${result.settings_source}).`
+      );
+      setShayari((items) => items.map((item) => (
+        item.id === editingId
+          ? { ...item, featured_image_url: result.public_url }
+          : item
+      )));
+    } catch (generationError: any) {
+      setError(generationError.message || 'Failed to generate image.');
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -431,11 +537,7 @@ export default function ManageShayariPage() {
     });
   };
 
-  const totalPages = Math.ceil(totalRecords / loadLimit);
-
-  if (loading) {
-    return <div className="text-center py-12">Loading...</div>;
-  }
+  const totalPages = Math.ceil(totalRecords / Math.min(loadLimit, FETCH_CHUNK));
 
   return (
     <div>
@@ -469,21 +571,23 @@ export default function ManageShayariPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadShayari(1, searchQuery)}
+            onKeyDown={(e) => e.key === 'Enter' && !loading && searchEntireDatabase()}
             placeholder="Search by title or slug..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
           />
         </div>
         <button
-          onClick={() => loadShayari(1, searchQuery)}
-          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          onClick={searchEntireDatabase}
+          disabled={loading}
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Search
         </button>
         {searchQuery && (
           <button
-            onClick={() => { setSearchQuery(''); loadShayari(1, '', loadLimit); }}
-            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={() => { setSearchQuery(''); loadRequestedShayari(loadLimit, ''); }}
+            disabled={loading}
+            className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Clear
           </button>
@@ -510,6 +614,12 @@ export default function ManageShayariPage() {
         </button>
         <span className="text-xs text-gray-400">(enter any number, e.g. 500, 3500, 10000)</span>
       </div>
+
+      {loadProgress && (
+        <div className='mb-4 text-sm text-gray-600' role='status' aria-live='polite'>
+          Loaded <strong>{loadProgress.loaded.toLocaleString()}</strong> of <strong>{loadProgress.requested.toLocaleString()}</strong>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -778,6 +888,38 @@ export default function ManageShayariPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
                       placeholder="https://example.com/image.jpg"
                     />
+                    {editingId && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            AI Image Prompt
+                          </label>
+                          <textarea
+                            value={imagePrompt}
+                            onChange={(event) => setImagePrompt(event.target.value)}
+                            rows={4}
+                            maxLength={4000}
+                            disabled={generatingImage}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 disabled:bg-gray-100"
+                            placeholder="Describe the image to generate for this shayari..."
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-gray-500">
+                            The generated image will be uploaded and saved to this shayari immediately.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleGenerateImage}
+                            disabled={generatingImage || !imagePrompt.trim()}
+                            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Sparkles size={18} />
+                            <span>{generatingImage ? 'Generating...' : 'Generate Image'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -896,8 +1038,24 @@ export default function ManageShayariPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div
+        className="relative min-h-[160px] bg-white rounded-lg shadow overflow-hidden"
+        aria-busy={loading}
+      >
+        {loading && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center bg-white/80 backdrop-blur-[1px] pt-16">
+            <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-white px-5 py-3 text-amber-700 shadow-md">
+              <Loader2 className="animate-spin" size={22} />
+              <span className="font-medium">
+                {loadProgress
+                  ? `Loading shayari... ${loadProgress.loaded.toLocaleString()} / ${loadProgress.requested.toLocaleString()}`
+                  : 'Loading shayari...'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <table className={`min-w-full divide-y divide-gray-200 transition-opacity ${loading ? 'opacity-40' : 'opacity-100'}`}>
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -965,7 +1123,7 @@ export default function ManageShayariPage() {
       </div>
 
       {/* Pagination */}
-      {totalRecords > 0 && (
+      {totalRecords > 0 && !bulkLoaded && (
         <div className="flex items-center justify-between px-4 py-3 mt-2 bg-white border border-gray-200 rounded-lg">
           <div className="text-sm text-gray-600">
             Total: <strong>{totalRecords.toLocaleString()}</strong> &nbsp;&mdash;&nbsp;

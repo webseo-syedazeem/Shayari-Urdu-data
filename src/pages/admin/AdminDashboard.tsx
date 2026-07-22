@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Users, Tag, FolderOpen, Book, FileText, DollarSign, LogOut, Home, Hash, Download } from 'lucide-react';
+import { BookOpen, Users, Tag, FolderOpen, Book, FileText, DollarSign, LogOut, Home, Hash, Download, Sparkles } from 'lucide-react';
 import ManageShayariPage from './ManageShayariPage';
 import ManagePoetsPage from './ManagePoetsPage';
 import ManageTopicsPage from './ManageTopicsPage';
@@ -9,6 +9,7 @@ import ManageEbooksPage from './ManageEbooksPage';
 import ManageDictionaryPage from './ManageDictionaryPage';
 import ManageAdSlotsPage from './ManageAdSlotsPage';
 import WordPressImportPage from './WordPressImportPage';
+import ManageAISettingsPage from './ManageAISettingsPage';
 import AdminErrorBoundary from '../../components/admin/AdminErrorBoundary';
 
 interface AdminDashboardProps {
@@ -16,7 +17,7 @@ interface AdminDashboardProps {
   onNavigate: (page: string) => void;
 }
 
-type AdminSection = 'overview' | 'shayari' | 'poets' | 'topics' | 'tags' | 'collections' | 'ebooks' | 'dictionary' | 'ads' | 'wordpress';
+type AdminSection = 'overview' | 'shayari' | 'poets' | 'topics' | 'tags' | 'collections' | 'ebooks' | 'dictionary' | 'ads' | 'wordpress' | 'ai-settings';
 
 export default function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -31,6 +32,7 @@ export default function AdminDashboard({ onLogout, onNavigate }: AdminDashboardP
     { id: 'dictionary' as const, label: 'Manage Dictionary', icon: FileText },
     { id: 'ads' as const, label: 'Manage Ad Slots', icon: DollarSign },
     { id: 'wordpress' as const, label: 'WordPress Import', icon: Download },
+    { id: 'ai-settings' as const, label: 'AI Settings', icon: Sparkles },
   ];
 
   const handleLogout = () => {
@@ -92,6 +94,12 @@ export default function AdminDashboard({ onLogout, onNavigate }: AdminDashboardP
         return (
           <AdminErrorBoundary key="wordpress">
             <WordPressImportPage onNavigate={onNavigate} />
+          </AdminErrorBoundary>
+        );
+      case 'ai-settings':
+        return (
+          <AdminErrorBoundary key="ai-settings">
+            <ManageAISettingsPage onBack={() => setActiveSection('overview')} />
           </AdminErrorBoundary>
         );
       default:

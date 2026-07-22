@@ -82,9 +82,18 @@ async function getShayariDetail(column: 'id' | 'slug', value: string) {
 router.get('/', async (req, res) => {
   try {
     const { form, language, topic, mood, sort = 'latest', poetId, q, is_trending, is_featured } = req.query;
+    const searchAll = String(req.query.searchAll) === 'true' && Boolean(String(q || '').trim());
     const page = parsePositiveInt(req.query.page, 1);
-    const pageSize = parsePositiveInt(req.query.pageSize, 20, 100);
-    const offset = (page - 1) * pageSize;
+    const pageSize = parsePositiveInt(req.query.pageSize, 20, 1000);
+    const calculatedOffset = (page - 1) * pageSize;
+    const batchOffsetHeader = req.get('X-Batch-Offset');
+    const batchOffset = batchOffsetHeader === undefined ? null : Number(batchOffsetHeader);
+    if (batchOffset !== null && (!Number.isInteger(batchOffset) || batchOffset < 0)) {
+      return res.status(400).json({ error: 'Invalid batch offset' });
+    }
+    // Normal pagination uses (page - 1) * pageSize. Bulk loading supplies the
+    // absolute offset because its final page can have a smaller pageSize.
+    const offset = batchOffset ?? calculatedOffset;
     const normalizedLanguage = normalizeLanguage(language);
     const normalizedForm = normalizeForm(form);
     const topicIds = topic ? await resolveTopicIds(topic) : null;
@@ -143,13 +152,39 @@ router.get('/', async (req, res) => {
       case 'mostLoved': query = query.order('popularity_score', { ascending: false }); break;
       default: query = query.order('created_at', { ascending: false }); break;
     }
+    query = query.order('id', { ascending: false });
 
-    query = query.range(offset, offset + pageSize - 1);
+    if (!searchAll) {
+      query = query.range(offset, offset + pageSize - 1);
+    }
 
     const { data, error, count } = await query;
+    if (error?.code === 'PGRST103') {
+      const totalMatch = String(error.details || '').match(/only\s+(\d+)\s+rows/i);
+      const total = totalMatch ? Number(totalMatch[1]) : 0;
+
+      return res.json({
+        data: [],
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize)
+        }
+      });
+    }
     if (error) throw error;
 
-    res.json({ data, pagination: { page, pageSize, total: count || 0, totalPages: Math.ceil((count || 0) / pageSize) } });
+    const responsePageSize = searchAll ? (data?.length || 0) : pageSize;
+    res.json({
+      data,
+      pagination: {
+        page: searchAll ? 1 : page,
+        pageSize: responsePageSize,
+        total: count || 0,
+        totalPages: searchAll ? ((count || 0) > 0 ? 1 : 0) : Math.ceil((count || 0) / pageSize)
+      }
+    });
   } catch (error) {
     console.error('Error fetching shayari:', error);
     res.status(500).json({ error: 'Failed to fetch shayari' });

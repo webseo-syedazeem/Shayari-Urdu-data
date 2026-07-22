@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="title description">
+  <title id="title">Poet image not found</title>
+  <desc id="description">Placeholder used when a poet profile image is unavailable.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#background)"/>
+  <circle cx="200" cy="135" r="58" fill="#94a3b8"/>
+  <path d="M92 286c12-65 53-98 108-98s96 33 108 98" fill="#94a3b8"/>
+  <text x="200" y="344" fill="#f8fafc" font-family="Arial, sans-serif" font-size="48" font-weight="700" text-anchor="middle">404</text>
+</svg>
