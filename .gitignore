@@ -21,3 +21,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Local WordPress media archive (deployed separately, not committed)
+/backend/public/
