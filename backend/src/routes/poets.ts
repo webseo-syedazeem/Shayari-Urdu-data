@@ -50,7 +50,7 @@ router.get('/by-id/:id', async (req, res) => {
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
-    const { data: poet, error: poetError } = await supabase.from('poets').select('*').eq('slug', slug).single();
+    const { data: poet, error: poetError } = await supabase.from('poets').select('*').eq('slug', slug).maybeSingle();
     if (poetError) throw poetError;
     if (!poet) return res.status(404).json({ error: 'Poet not found' });
 

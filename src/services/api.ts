@@ -67,6 +67,7 @@ export interface Shayari {
   form: string;
   is_trending: boolean;
   is_featured: boolean;
+  is_poetry_of_the_day: boolean;
   popularity_score: number;
   created_at: string;
   updated_at?: string | null;
@@ -199,6 +200,11 @@ class ApiService {
       is_featured: params?.is_featured
     });
     return apiFetch<{ data: Shayari[]; pagination: any }>(`/api/shayari${qs}`);
+  }
+
+  async getPoetryOfTheDay(params?: { page?: number; pageSize?: number }) {
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize });
+    return apiFetch<{ data: Shayari[]; pagination: any }>(`/api/shayari/poetry-of-the-day${qs}`);
   }
 
   async getShayariById(id: string) {

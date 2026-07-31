@@ -14,6 +14,7 @@ interface ShayariFormData {
   form: string;
   is_trending: boolean;
   is_featured: boolean;
+  is_poetry_of_the_day: boolean;
   popularity_score: number;
   featured_image_url: string;
   featured_image_alt: string;
@@ -45,6 +46,7 @@ export default function ManageShayariPage() {
     form: 'sher',
     is_trending: false,
     is_featured: false,
+    is_poetry_of_the_day: false,
     popularity_score: 0,
     featured_image_url: '',
     featured_image_alt: '',
@@ -235,6 +237,7 @@ export default function ManageShayariPage() {
       form: 'sher',
       is_trending: false,
       is_featured: false,
+      is_poetry_of_the_day: false,
       popularity_score: 0,
       featured_image_url: '',
       featured_image_alt: '',
@@ -299,6 +302,7 @@ export default function ManageShayariPage() {
         form: data.form || 'sher',
         is_trending: data.is_trending || false,
         is_featured: data.is_featured || false,
+        is_poetry_of_the_day: data.is_poetry_of_the_day || false,
         popularity_score: data.popularity_score || 0,
         featured_image_url: data.featured_image_url || '',
         featured_image_alt: data.featured_image_alt || '',
@@ -405,6 +409,7 @@ export default function ManageShayariPage() {
         form: formData.form || 'sher',
         is_trending: formData.is_trending || false,
         is_featured: formData.is_featured || false,
+        is_poetry_of_the_day: formData.is_poetry_of_the_day || false,
         popularity_score: formData.popularity_score || 0,
         featured_image_url: featuredImageUrl || '',
         featured_image_alt: formData.featured_image_alt || '',
@@ -799,7 +804,7 @@ export default function ManageShayariPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="flex items-center">
                     <input
                       type="checkbox"
@@ -823,6 +828,19 @@ export default function ManageShayariPage() {
                     />
                     <label htmlFor="is_featured" className="ml-2 text-sm text-gray-700">
                       Featured
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="is_poetry_of_the_day"
+                      checked={formData.is_poetry_of_the_day}
+                      onChange={(e) => setFormData({ ...formData, is_poetry_of_the_day: e.target.checked })}
+                      className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                    />
+                    <label htmlFor="is_poetry_of_the_day" className="ml-2 text-sm text-gray-700">
+                      Poetry of the Day
                     </label>
                   </div>
                 </div>

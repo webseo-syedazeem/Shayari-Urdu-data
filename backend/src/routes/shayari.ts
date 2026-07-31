@@ -191,6 +191,37 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/poetry-of-the-day', async (req, res) => {
+  try {
+    const page = parsePositiveInt(req.query.page, 1);
+    const pageSize = parsePositiveInt(req.query.pageSize, 10, 50);
+    const offset = (page - 1) * pageSize;
+
+    const { data, error, count } = await supabase
+      .from('shayari')
+      .select('*, poets(name, slug, avatar_url), shayari_language_versions(language, text)', { count: 'exact' })
+      .eq('is_poetry_of_the_day', true)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) throw error;
+
+    res.json({
+      data,
+      pagination: {
+        page,
+        pageSize,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching Poetry of the Day:', error);
+    res.status(500).json({ error: 'Failed to fetch Poetry of the Day' });
+  }
+});
+
 router.get('/by-slug', async (req, res) => {
   try {
     const { slug } = req.query;
@@ -240,7 +271,7 @@ router.get('/:id/chat', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { poet_id, form, topics, tags, is_trending, is_featured, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
+    const { poet_id, form, topics, tags, is_trending, is_featured, is_poetry_of_the_day, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
 
     if (!poet_id) return res.status(400).json({ error: true, message: 'poet_id is required' });
 
@@ -256,7 +287,9 @@ router.post('/', async (req, res) => {
 
     const { data: shayari, error: shayariError } = await supabase.from('shayari').insert({
       poet_id, form: form || 'sher', is_trending: is_trending || false,
-      is_featured: is_featured || false, popularity_score: popularity_score || 0,
+      is_featured: is_featured || false,
+      is_poetry_of_the_day: is_poetry_of_the_day || false,
+      popularity_score: popularity_score || 0,
       featured_image_url: featured_image_url || null, featured_image_alt: featured_image_alt || null,
       wordpress_featured_image_id: wordpress_featured_image_id || null,
       slug: slug || null, seo_title: seo_title?.trim() || null,
@@ -295,13 +328,14 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { poet_id, form, topics, tags, is_trending, is_featured, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
+    const { poet_id, form, topics, tags, is_trending, is_featured, is_poetry_of_the_day, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
 
     const updateData: any = {};
     if (poet_id !== undefined) updateData.poet_id = poet_id;
     if (form !== undefined) updateData.form = form;
     if (is_trending !== undefined) updateData.is_trending = is_trending;
     if (is_featured !== undefined) updateData.is_featured = is_featured;
+    if (is_poetry_of_the_day !== undefined) updateData.is_poetry_of_the_day = is_poetry_of_the_day;
     if (popularity_score !== undefined) updateData.popularity_score = popularity_score;
     if (featured_image_url !== undefined) updateData.featured_image_url = featured_image_url;
     if (featured_image_alt !== undefined) updateData.featured_image_alt = featured_image_alt;

@@ -1,10 +1,11 @@
-import { ArrowRight, Sparkles, TrendingUp, Star } from 'lucide-react';
+import { ArrowRight, Sparkles, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ShayariCard from '../components/ShayariCard';
 import PoetCard from '../components/PoetCard';
 import TopicCard from '../components/TopicCard';
 import CollectionCard from '../components/CollectionCard';
 import Carousel from '../components/Carousel';
+import { PoetryOfTheDay } from '../components/PoetryOfTheDay';
 import { AdSlot } from '../components/ads/AdSlot';
 import { Seo } from '../components/seo/Seo';
 import { api, Shayari, Poet, Topic, Collection } from '../services/api';
@@ -16,6 +17,7 @@ interface HomePageProps {
 
 export default function HomePage({ onNavigate }: HomePageProps) {
   const [featuredShayari, setFeaturedShayari] = useState<Shayari[]>([]);
+  const [poetryOfTheDay, setPoetryOfTheDay] = useState<Shayari[]>([]);
   const [trendingShayari, setTrendingShayari] = useState<Shayari[]>([]);
   const [mostLovedShayari, setMostLovedShayari] = useState<Shayari[]>([]);
   const [topPoets, setTopPoets] = useState<Poet[]>([]);
@@ -26,14 +28,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const [shayariRes, poetsRes, topicsRes, collectionsRes] = await Promise.all([
+        const [shayariRes, poetryOfTheDayRes, poetsRes, topicsRes, collectionsRes] = await Promise.all([
           api.getShayari({ pageSize: 20 }),
+          api.getPoetryOfTheDay({ pageSize: 10 }),
           api.getPoets({ pageSize: 6 }),
           api.getTopics(),
           api.getCollections({ pageSize: 3 })
         ]);
 
         setFeaturedShayari(shayariRes.data.filter(s => s.is_featured).slice(0, 3));
+        setPoetryOfTheDay(poetryOfTheDayRes.data);
         setTrendingShayari(shayariRes.data.filter(s => s.is_trending).slice(0, 6));
         setMostLovedShayari(shayariRes.data.sort((a, b) => b.popularity_score - a.popularity_score).slice(0, 6));
         setTopPoets(poetsRes.data);
@@ -142,6 +146,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <AdSlot placement="home_hero_top" pageScope="home" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <PoetryOfTheDay
+          items={poetryOfTheDay}
+          onSelect={(shayari) => onNavigate('shayari', getShayariUrl(shayari))}
+        />
+
         <section className="mb-16">
           <Carousel title="Trending Shayari Today">
             {trendingShayari.map((shayari) => (
