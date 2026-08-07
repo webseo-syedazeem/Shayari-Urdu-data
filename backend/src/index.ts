@@ -17,6 +17,8 @@ import importWordPressRouter from './routes/importWordPress';
 import importWordPressRawRouter from './routes/importWordPressRaw';
 import chatRouter from './routes/chat';
 import aiImageSettingsRouter from './routes/aiImageSettings';
+import internalPersistRouter from './routes/internalPersist';
+import { startCacheFlusher } from './scripts/cacheFlusher';
 
 dotenv.config();
 
@@ -25,8 +27,9 @@ const PORT = process.env.PORT || 3002;
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
 app.use(cors({ origin: corsOrigin }));
-app.use(express.json());
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'));
+app.use('/api/internal/persist', express.raw({ type: 'application/json' }), internalPersistRouter);
+app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, '../public'), {
   fallthrough: false,
   maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0
@@ -57,5 +60,6 @@ app.get('/api/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`\nBackend running on http://localhost:${PORT}`);
   console.log(`Supabase URL: ${process.env.SUPABASE_URL}`);
-  console.log(`Using: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'service_role key ✓' : 'anon key (no service role set)'}\n`);
+  console.log(process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Using: service_role key configured' : 'Using: anon key (no service role set)');
+  startCacheFlusher();
 });

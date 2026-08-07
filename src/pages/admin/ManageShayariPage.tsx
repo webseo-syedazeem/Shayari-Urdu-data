@@ -221,7 +221,7 @@ export default function ManageShayariPage() {
 
   const loadTags = async () => {
     try {
-      const data = await adminApi.get('/tags');
+      const data = await adminApi.get('/tags/all');
       console.log('LOADED TAGS:', data.length, 'First tag ID type:', typeof data[0]?.id, 'Value:', data[0]?.id);
       setTags(data);
     } catch (error) {

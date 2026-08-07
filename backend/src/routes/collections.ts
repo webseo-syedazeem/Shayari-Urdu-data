@@ -8,15 +8,13 @@ router.get('/', async (req, res) => {
     const { page = '1', pageSize = '20' } = req.query;
     const offset = (Number(page) - 1) * Number(pageSize);
 
-    const { data, error, count } = await supabase.from('collections').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(offset, offset + Number(pageSize) - 1);
+    const { data, error, count } = await supabase.from('collections').select('*, collection_items(count)', { count: 'exact' }).order('created_at', { ascending: false }).range(offset, offset + Number(pageSize) - 1);
     if (error) throw error;
 
-    const collectionsWithCounts = await Promise.all(
-      (data || []).map(async (collection) => {
-        const { count } = await supabase.from('collection_items').select('*', { count: 'exact', head: true }).eq('collection_id', collection.id);
-        return { ...collection, itemCount: count || 0 };
-      })
-    );
+    const collectionsWithCounts = (data || []).map(({ collection_items, ...collection }: any) => ({
+      ...collection,
+      itemCount: Number(collection_items?.[0]?.count || 0),
+    }));
 
     res.json({ data: collectionsWithCounts, pagination: { page: Number(page), pageSize: Number(pageSize), total: count || 0, totalPages: Math.ceil((count || 0) / Number(pageSize)) } });
   } catch (error) {

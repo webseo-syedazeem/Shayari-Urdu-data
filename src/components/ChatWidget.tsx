@@ -180,7 +180,7 @@ export default function ChatWidget() {
                 {messages.length === 0 ? (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     <MessageCircle size={36} color="#D1D5DB" />
-                    <p style={{ fontSize: '13px', margin: 0, color: '#9CA3AF' }}>No messages yet. Say Salam! 👋</p>
+                    <p style={{ fontSize: '13px', margin: 0, color: '#9CA3AF' }}>No messages yet.</p>
                   </div>
                 ) : (
                   messages.map((msg: ChatMessage, i: number) => {

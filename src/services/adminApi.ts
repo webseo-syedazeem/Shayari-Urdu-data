@@ -82,9 +82,13 @@ export const adminApi = {
       return (result.data ?? result) as T;
     }
     if (endpoint.startsWith('/tags')) {
+      if (endpoint === '/tags/all') {
+        const result = await adminFetch<any>('/api/tags/all');
+        return (result.data ?? result) as T;
+      }
       const parts = endpoint.split('/').filter(Boolean);
       if (parts.length === 2) return adminFetch<T>(`/api/tags/by-id/${parts[1]}`);
-      const result = await adminFetch<any>('/api/tags');
+      const result = await adminFetch<any>('/api/tags?page=1&pageSize=100');
       return (result.data ?? result) as T;
     }
     if (endpoint.startsWith('/topics')) {

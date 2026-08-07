@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
 import SeoSettingsSection from '../../components/admin/SeoSettingsSection';
@@ -13,8 +13,12 @@ interface TagFormData {
   seo_keywords: string;
 }
 
+const PAGE_SIZE = 100;
+
 export default function ManageTagsPage() {
   const [tags, setTags] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,14 +35,17 @@ export default function ManageTagsPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    loadTags();
+    loadTags(1);
   }, []);
 
-  const loadTags = async () => {
+  const loadTags = async (displayPage = 1) => {
     try {
       setLoading(true);
-      const response = await api.getTags();
+      setError('');
+      const response = await api.getTags({ page: displayPage, pageSize: PAGE_SIZE });
       setTags(response.data);
+      setTotalRecords(response.pagination.total);
+      setCurrentPage(displayPage);
     } catch (error) {
       console.error('Error loading tags:', error);
       setError('Failed to load tags');
@@ -79,19 +86,24 @@ export default function ManageTagsPage() {
     setSuccess('');
   };
 
-  const handleEdit = (tag: any) => {
-    setEditingId(tag.id);
-    setFormData({
-      name: tag.name || '',
-      slug: tag.slug || '',
-      description: tag.description || '',
-      seo_title: tag.seo_title || '',
-      seo_description: tag.seo_description || '',
-      seo_keywords: tag.seo_keywords || ''
-    });
-    setShowForm(true);
+  const handleEdit = async (tag: any) => {
     setError('');
     setSuccess('');
+    try {
+      const fullTag = await adminApi.get<any>(`/tags/${tag.id}`);
+      setEditingId(fullTag.id);
+      setFormData({
+        name: fullTag.name || '',
+        slug: fullTag.slug || '',
+        description: fullTag.description || '',
+        seo_title: fullTag.seo_title || '',
+        seo_description: fullTag.seo_description || '',
+        seo_keywords: fullTag.seo_keywords || ''
+      });
+      setShowForm(true);
+    } catch (error: any) {
+      setError(error.message || 'Failed to load tag');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,7 +137,7 @@ export default function ManageTagsPage() {
       }
 
       setShowForm(false);
-      loadTags();
+      loadTags(currentPage);
     } catch (error: any) {
       console.error('Error saving tag:', error);
       setError(error.message || 'Failed to save tag');
@@ -142,16 +154,14 @@ export default function ManageTagsPage() {
     try {
       await adminApi.delete(`/tags/${id}`);
       setSuccess('Tag deleted successfully');
-      loadTags();
+      loadTags(currentPage);
     } catch (error: any) {
       console.error('Error deleting tag:', error);
       setError(error.message || 'Failed to delete tag');
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-12">Loading...</div>;
-  }
+  const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
 
   return (
     <div>
@@ -260,8 +270,20 @@ export default function ManageTagsPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div
+        className="relative min-h-[160px] bg-white rounded-lg shadow overflow-hidden"
+        aria-busy={loading}
+      >
+        {loading && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center bg-white/80 backdrop-blur-[1px] pt-16">
+            <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-white px-5 py-3 text-amber-700 shadow-md">
+              <Loader2 className="animate-spin" size={22} />
+              <span className="font-medium">Loading tags...</span>
+            </div>
+          </div>
+        )}
+
+        <table className={`min-w-full divide-y divide-gray-200 transition-opacity ${loading ? 'opacity-40' : 'opacity-100'}`}>
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -312,7 +334,33 @@ export default function ManageTagsPage() {
         </table>
       </div>
 
-      {tags.length === 0 && (
+      {totalRecords > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 mt-2 bg-white border border-gray-200 rounded-lg">
+          <div className="text-sm text-gray-600">
+            Total: <strong>{totalRecords.toLocaleString()}</strong> &nbsp;&mdash;&nbsp;
+            Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+            {' '}({PAGE_SIZE} per page)
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => loadTags(currentPage - 1)}
+              disabled={currentPage <= 1 || loading}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              &larr; Prev
+            </button>
+            <button
+              onClick={() => loadTags(currentPage + 1)}
+              disabled={currentPage >= totalPages || loading}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && tags.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           No tags found
         </div>

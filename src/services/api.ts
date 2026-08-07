@@ -240,8 +240,13 @@ class ApiService {
     return apiFetch<any>(`/api/topics/${encodeURIComponent(slug)}`);
   }
 
-  async getTags() {
-    return apiFetch<{ data: Tag[] }>('/api/tags');
+  async getTags(params?: { page?: number; pageSize?: number }) {
+    const qs = buildQuery({ page: params?.page, pageSize: params?.pageSize });
+    return apiFetch<{ data: Tag[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(`/api/tags${qs}`);
+  }
+
+  async getAllTags() {
+    return apiFetch<{ data: Pick<Tag, 'id' | 'name' | 'slug'>[] }>('/api/tags/all');
   }
 
   async getTag(slug: string) {

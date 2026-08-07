@@ -5,15 +5,16 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('topics').select('*').order('name');
+    const { data, error } = await supabase
+      .from('topics')
+      .select('*, shayari_topics(count)')
+      .order('name');
     if (error) throw error;
 
-    const topicsWithCounts = await Promise.all(
-      (data || []).map(async (topic) => {
-        const { count } = await supabase.from('shayari_topics').select('*', { count: 'exact', head: true }).eq('topic_id', topic.id);
-        return { ...topic, count: count || 0 };
-      })
-    );
+    const topicsWithCounts = (data || []).map(({ shayari_topics, ...topic }: any) => ({
+      ...topic,
+      count: Number(shayari_topics?.[0]?.count || 0),
+    }));
     res.json({ data: topicsWithCounts });
   } catch (error) {
     console.error('Error fetching topics:', error);

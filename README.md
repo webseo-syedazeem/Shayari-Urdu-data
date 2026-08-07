@@ -223,6 +223,22 @@ useEffect(() => {
 - CORS enabled
 - RESTful JSON API
 
+## Durable QStash Persistence
+
+Admin tag and shayari writes update Redis first, then publish a signed QStash callback to `POST /api/internal/persist`. The callback persists the latest cached revision to Supabase. The Redis dirty set and five-minute flusher remain as a retry safety net.
+
+Add these backend environment variables:
+
+```env
+QSTASH_TOKEN=
+QSTASH_CURRENT_SIGNING_KEY=
+QSTASH_NEXT_SIGNING_KEY=
+BACKEND_PUBLIC_URL=https://api.example.com
+```
+
+`BACKEND_PUBLIC_URL` must be the public backend origin reachable by QStash. Use HTTPS in production; a plain HTTP IP sends callback traffic without transport encryption. QStash cannot call `localhost`. For local callback testing, either use a deployed backend URL or run the Upstash local development server with `npx @upstash/qstash-cli dev` and configure its forwarding URL.
+
+The internal persistence endpoint consumes the raw request body and verifies the `Upstash-Signature` header before parsing JSON. Do not place JSON body parsing before this route.
 ## Development Notes
 
 - Frontend runs on port 5173 (Vite default)

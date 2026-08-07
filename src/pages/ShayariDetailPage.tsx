@@ -51,6 +51,7 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
     async function loadShayari() {
       try {
         setLoading(true);
+        setSimilarShayari([]);
         const result = shayariSlug
           ? await api.getShayariBySlug(shayariSlug)
           : shayariId
@@ -59,11 +60,46 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
         setShayari(result);
 
         if (result) {
-          const similarRes = await api.getShayari({
-            poetId: result.poet_id,
-            pageSize: 4
-          });
-          setSimilarShayari(similarRes.data.filter(s => s.id !== result.id).slice(0, 3));
+          try {
+            const candidates: Shayari[] = [];
+            const seenIds = new Set([result.id]);
+            const addCandidates = (items: Shayari[] = []) => {
+              items.forEach((item) => {
+                if (candidates.length < 3 && !seenIds.has(item.id)) {
+                  seenIds.add(item.id);
+                  candidates.push(item);
+                }
+              });
+            };
+
+            // Prefer poetry by the same poet, including the related items already
+            // returned with the detail response.
+            addCandidates(result.relatedShayari);
+
+            if (candidates.length < 3 && result.poet_id) {
+              const samePoetRes = await api.getShayari({
+                poetId: result.poet_id,
+                pageSize: 6
+              });
+              addCandidates(samePoetRes.data);
+            }
+
+            // Some homepage picks are the poet's only published item. Fill the
+            // section with popular poetry of the same form instead of hiding it.
+            if (candidates.length < 3) {
+              const sameFormRes = await api.getShayari({
+                form: result.form,
+                sort: 'mostLoved',
+                pageSize: 12
+              });
+              addCandidates(sameFormRes.data);
+            }
+
+            setSimilarShayari(candidates);
+          } catch (similarError) {
+            // Recommendations should never prevent the selected shayari loading.
+            console.error('Error loading similar shayari:', similarError);
+          }
         }
       } catch (error) {
         console.error('Error loading shayari:', error);
