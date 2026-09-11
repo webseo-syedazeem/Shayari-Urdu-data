@@ -10,7 +10,7 @@ export default function TagCard({ tag, onClick }: TagCardProps) {
   return (
     <button
       onClick={onClick}
-      className="group bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-md transition-all p-6 text-left border border-gray-200 dark:border-slate-700 hover:border-amber-500 dark:hover:border-amber-500"
+      className="group bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-md transition-all p-6 text-left border border-gray-200 dark:border-neutral-700 hover:border-amber-500 dark:hover:border-amber-500"
     >
       <div className="flex items-center space-x-3 mb-3">
         <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">

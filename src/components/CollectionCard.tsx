@@ -9,7 +9,7 @@ interface CollectionCardProps {
 export default function CollectionCard({ collection, onClick }: CollectionCardProps) {
   return (
     <div
-      className="bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1"
+      className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100 dark:border-neutral-700 hover:-translate-y-1"
       onClick={onClick}
     >
       <div className="relative h-48 overflow-hidden">

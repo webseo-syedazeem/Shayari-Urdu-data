@@ -14,14 +14,14 @@ export default function PoetCard({ poet, onClick }: PoetCardProps) {
 
   return (
     <div
-      className="h-full min-h-[326px] bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1 text-center flex flex-col"
+      className="h-full min-h-[326px] bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-neutral-700 hover:-translate-y-1 text-center flex flex-col"
       onClick={onClick}
     >
       <div className="mb-4 shrink-0">
         <img
           src={poet.avatar_url || FALLBACK_AVATAR}
           alt={poet.avatar_url ? poet.name : `${poet.name} image not available`}
-          className="w-24 h-24 rounded-full mx-auto object-cover border-4 border-gray-100 dark:border-slate-700"
+          className="w-24 h-24 rounded-full mx-auto object-cover border-4 border-gray-100 dark:border-neutral-700"
           onError={(event) => {
             if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
               event.currentTarget.src = FALLBACK_AVATAR;
@@ -42,7 +42,7 @@ export default function PoetCard({ poet, onClick }: PoetCardProps) {
         <span className="text-xs text-gray-500 dark:text-gray-400">{poet.country}</span>
       </div>
 
-      <button className="w-full mt-auto py-2 px-4 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors">
+      <button className="w-full mt-auto py-2 px-4 bg-slate-700 hover:bg-slate-800 dark:bg-neutral-600 dark:hover:bg-neutral-700 text-white rounded-lg text-sm font-medium transition-colors">
         View Shayari
       </button>
     </div>

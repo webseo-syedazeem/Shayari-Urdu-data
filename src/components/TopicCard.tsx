@@ -11,7 +11,7 @@ export default function TopicCard({ topic, onClick }: TopicCardProps) {
 
   return (
     <div
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1"
+      className="bg-gradient-to-br from-slate-50 to-white dark:from-neutral-800 dark:to-neutral-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-neutral-700 hover:-translate-y-1"
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-4">

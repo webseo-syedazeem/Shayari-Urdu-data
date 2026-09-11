@@ -42,10 +42,10 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
         </div>
       )}
       <div
-        className="h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1 relative overflow-hidden flex flex-col"
+        className="h-full bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100 dark:border-neutral-700 hover:-translate-y-1 relative overflow-hidden flex flex-col"
         onClick={onClick}
       >
-        <div className="w-full h-48 shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-700">
+        <div className="w-full h-48 shrink-0 overflow-hidden bg-slate-100 dark:bg-neutral-700">
           <img
             src={shayari.featured_image_url || FALLBACK_IMAGE}
             alt={shayari.featured_image_alt || 'Shayari image not available'}
@@ -82,7 +82,7 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          <span className="px-2 py-1 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 rounded text-xs">
+          <span className="px-2 py-1 bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-gray-300 rounded text-xs">
             {shayari.form}
           </span>
           {shayari.is_trending && (
@@ -92,7 +92,7 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
           )}
         </div>
 
-          <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-100 dark:border-slate-700">
+          <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-100 dark:border-neutral-700">
             <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
               <button className="flex items-center space-x-1 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                 <Heart size={16} />
@@ -102,7 +102,7 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
                 <Bookmark size={16} />
               </button>
             </div>
-            <button className="text-gray-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <button className="text-gray-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-neutral-300 transition-colors">
               <Share2 size={16} />
             </button>
           </div>

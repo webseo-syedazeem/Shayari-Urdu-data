@@ -26,14 +26,14 @@ export default function Carousel({ children, title }: CarouselProps) {
         <div className="flex space-x-2">
           <button
             onClick={() => scroll('left')}
-            className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
+            className="p-2 rounded-full bg-white dark:bg-neutral-800 shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700"
             aria-label="Scroll left"
           >
             <ChevronLeft size={20} className="text-gray-700 dark:text-gray-300" />
           </button>
           <button
             onClick={() => scroll('right')}
-            className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
+            className="p-2 rounded-full bg-white dark:bg-neutral-800 shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700"
             aria-label="Scroll right"
           >
             <ChevronRight size={20} className="text-gray-700 dark:text-gray-300" />

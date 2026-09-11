@@ -115,7 +115,7 @@ function LegacyShayariRoute({ onNavigate }: { onNavigate: (page: string, id?: st
   if (notFound) return <Navigate to="/explore" replace />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-900">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 dark:border-amber-500 mx-auto mb-4"></div>
         <p className="text-gray-600 dark:text-gray-300">Loading...</p>
@@ -261,7 +261,7 @@ function App() {
   const renderRoutes = () => {
     if (isCheckingAuth) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-900">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 dark:border-amber-500 mx-auto mb-4"></div>
             <p className="text-gray-600 dark:text-gray-300">Loading...</p>
@@ -309,14 +309,14 @@ function App() {
 
   if (isAdminPage) {
     return (
-      <div className="min-h-screen bg-white dark:bg-slate-900">
+      <div className="min-h-screen bg-white dark:bg-neutral-900">
         {renderRoutes()}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-neutral-900 transition-colors">
       <Header currentPage={currentPage} onNavigate={handleNavigate} onSearch={handleSearch} />
       <AdSlot placement="header" pageScope="global" />
       <main className="flex-1">{renderRoutes()}</main>

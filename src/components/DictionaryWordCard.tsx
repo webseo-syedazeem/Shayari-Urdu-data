@@ -23,7 +23,7 @@ export default function DictionaryWordCard({ entry, onClick }: DictionaryWordCar
 
   return (
     <div
-      className="bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-slate-700 hover:-translate-y-1"
+      className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 p-6 cursor-pointer border border-gray-100 dark:border-neutral-700 hover:-translate-y-1"
       onClick={onClick}
     >
       <div className="mb-4">
@@ -34,7 +34,7 @@ export default function DictionaryWordCard({ entry, onClick }: DictionaryWordCar
       </div>
 
       {entry.part_of_speech && (
-        <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full text-xs font-medium mb-3">
+        <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-neutral-700 text-slate-700 dark:text-neutral-300 rounded-full text-xs font-medium mb-3">
           {entry.part_of_speech}
         </span>
       )}
@@ -47,7 +47,7 @@ export default function DictionaryWordCard({ entry, onClick }: DictionaryWordCar
         </p>
       </div>
 
-      <button className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-medium text-sm transition-colors">
+      <button className="flex items-center space-x-2 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white font-medium text-sm transition-colors">
         <BookOpen size={16} />
         <span>View Details</span>
       </button>

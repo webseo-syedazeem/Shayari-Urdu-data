@@ -132,17 +132,17 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
   const showProgress = importing || completed || progress.imported > 0 || progress.skipped > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <button
           onClick={() => onNavigate('admin')}
-          className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-6"
+          className="flex items-center space-x-2 text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white mb-6"
         >
           <ArrowLeft size={20} />
           <span>Back to Dashboard</span>
         </button>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-8">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-8">
           <div className="flex items-center space-x-3 mb-6">
             <Download size={32} className="text-amber-600" />
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">WordPress Import</h1>
@@ -158,7 +158,7 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
               onChange={(e) => setWordpressUrl(e.target.value)}
               placeholder="https://shayariurdu.com/wp-json/wp/v2/posts?per_page=50"
               disabled={importing}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-neutral-700 text-gray-900 dark:text-white"
             />
        
           </div>
@@ -188,7 +188,7 @@ export default function WordPressImportPage({ onNavigate }: WordPressImportPageP
           )}
 
           {showProgress && (
-            <div className="mt-8 p-6 bg-gray-50 dark:bg-slate-700 rounded-lg">
+            <div className="mt-8 p-6 bg-gray-50 dark:bg-neutral-700 rounded-lg">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Progress</h2>
               <div className="space-y-3">
                 {progress.currentPage > 0 && (

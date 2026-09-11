@@ -55,7 +55,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-neutral-900 dark:to-neutral-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-700 dark:border-amber-500 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-300">Loading...</p>
@@ -65,7 +65,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-neutral-900 dark:to-neutral-800">
       <Seo
         title="ShayariUrdu.com – Urdu, Roman Urdu, Hindi & English Shayari"
         description="Discover beautiful Urdu, Roman Urdu, Hindi and English shayari, ghazals, nazms and poetry quotes by your favorite poets. Browse by topics, moods, and collections."
@@ -188,7 +188,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </div>
             <button
               onClick={() => onNavigate('poets')}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
+              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-neutral-600 dark:hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
             >
               <span>View All</span>
               <ArrowRight size={18} />
@@ -216,7 +216,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </div>
             <button
               onClick={() => onNavigate('topics')}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
+              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-neutral-600 dark:hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
             >
               <span>View All</span>
               <ArrowRight size={18} />
@@ -244,7 +244,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </div>
             <button
               onClick={() => onNavigate('collections')}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
+              className="px-6 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-neutral-600 dark:hover:bg-neutral-700 text-white font-medium rounded-lg transition-colors flex items-center space-x-2"
             >
               <span>View All</span>
               <ArrowRight size={18} />
