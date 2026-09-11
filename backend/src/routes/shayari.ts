@@ -126,11 +126,10 @@ async function getPendingShayari(): Promise<CachedRecord[]> {
 
 function matchesListFilters(value: CachedRecord, filters: {
   poetId: unknown; form: string | null; language: string | null; topicIds: string[] | null;
-  moodTopicIds: string[] | null; q: unknown; isTrending: unknown; isFeatured: unknown;
+  moodTopicIds: string[] | null; q: unknown; isFeatured: unknown;
 }) {
   if (filters.poetId && value.poet_id !== filters.poetId) return false;
   if (filters.form && value.form !== filters.form) return false;
-  if (filters.isTrending !== undefined && Boolean(value.is_trending) !== (String(filters.isTrending) === 'true')) return false;
   if (filters.isFeatured !== undefined && Boolean(value.is_featured) !== (String(filters.isFeatured) === 'true')) return false;
   if (filters.language && !languageMap(value)[filters.language]) return false;
   const topics = relationIds(value, 'topics', 'topic_ids');
@@ -146,14 +145,14 @@ function matchesListFilters(value: CachedRecord, filters: {
 
 function sortShayari(values: CachedRecord[], sort: unknown) {
   return values.sort((a, b) => {
-    if (sort === 'trending' || sort === 'mostLoved') return Number(b.popularity_score || 0) - Number(a.popularity_score || 0);
+    if (sort === 'mostLoved') return Number(b.popularity_score || 0) - Number(a.popularity_score || 0);
     const dateDifference = Date.parse(b.created_at || '') - Date.parse(a.created_at || '');
     return dateDifference || String(b.id).localeCompare(String(a.id));
   });
 }
 router.get('/', async (req, res) => {
   try {
-    const { form, language, topic, mood, sort = 'latest', poetId, q, is_trending, is_featured } = req.query;
+    const { form, language, topic, mood, sort = 'latest', poetId, q, is_featured } = req.query;
     const searchAll = String(req.query.searchAll) === 'true' && Boolean(String(q || '').trim());
     const page = parsePositiveInt(req.query.page, 1);
     const pageSize = parsePositiveInt(req.query.pageSize, 20, 1000);
@@ -181,7 +180,6 @@ router.get('/', async (req, res) => {
       let query = supabase.from('shayari').select(`*, poets(name, slug, avatar_url), ${languageSelect}${topicSelect}`, { count: 'exact' });
       if (poetId) query = query.eq('poet_id', poetId);
       if (normalizedForm) query = query.eq('form', normalizedForm);
-      if (is_trending !== undefined) query = query.eq('is_trending', String(is_trending) === 'true');
       if (is_featured !== undefined) query = query.eq('is_featured', String(is_featured) === 'true');
       if (normalizedLanguage) query = query.eq('shayari_language_versions.language', normalizedLanguage);
       if (topicIds?.length) query = query.in('shayari_topics.topic_id', topicIds);
@@ -196,7 +194,6 @@ router.get('/', async (req, res) => {
         }
       }
       switch (sort) {
-        case 'trending': query = query.eq('is_trending', true).order('popularity_score', { ascending: false }); break;
         case 'mostLoved': query = query.order('popularity_score', { ascending: false }); break;
         default: query = query.order('created_at', { ascending: false });
       }
@@ -214,7 +211,7 @@ router.get('/', async (req, res) => {
       let responseData = (data || []) as unknown as CachedRecord[];
       let responseTotal = count || 0;
       for (const pending of await getPendingShayari()) {
-        const matches = matchesListFilters(pending, { poetId, form: normalizedForm, language: normalizedLanguage, topicIds, moodTopicIds, q, isTrending: is_trending, isFeatured: is_featured });
+        const matches = matchesListFilters(pending, { poetId, form: normalizedForm, language: normalizedLanguage, topicIds, moodTopicIds, q, isFeatured: is_featured });
         const index = responseData.findIndex((item) => item.id === pending.id);
         if (pending._deleted) {
           if (index >= 0) responseData.splice(index, 1);
@@ -327,14 +324,14 @@ router.get('/:id/chat', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { poet_id, form, topics, tags, is_trending, is_featured, is_poetry_of_the_day, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
+    const { poet_id, form, topics, tags, is_featured, is_poetry_of_the_day, popularity_score, featured_image_url, featured_image_alt, wordpress_featured_image_id, languages, slug, seo_title, seo_description, seo_keywords } = req.body;
     if (!poet_id) return res.status(400).json({ error: true, message: 'poet_id is required' });
     const filteredLanguages = Object.fromEntries(Object.entries(languages || {}).filter(([, value]) => typeof value === 'string' && value.trim()));
     if (Object.keys(filteredLanguages).length === 0) return res.status(400).json({ error: true, message: 'At least one language version with text is required' });
 
     const id = randomUUID();
     const value: CachedRecord = {
-      id, poet_id, form: form || 'sher', is_trending: is_trending || false,
+      id, poet_id, form: form || 'sher',
       is_featured: is_featured || false, is_poetry_of_the_day: is_poetry_of_the_day || false,
       popularity_score: popularity_score || 0, featured_image_url: featured_image_url || null,
       featured_image_alt: featured_image_alt || null, wordpress_featured_image_id: wordpress_featured_image_id || null,
@@ -365,7 +362,7 @@ router.put('/:id', async (req, res) => {
     if (!current || current._deleted) return res.status(404).json({ error: true, message: 'Shayari not found' });
     const body = req.body;
     const updates: Record<string, unknown> = {};
-    for (const field of ['poet_id', 'form', 'is_trending', 'is_featured', 'is_poetry_of_the_day', 'popularity_score', 'featured_image_url', 'featured_image_alt', 'wordpress_featured_image_id']) {
+    for (const field of ['poet_id', 'form', 'is_featured', 'is_poetry_of_the_day', 'popularity_score', 'featured_image_url', 'featured_image_alt', 'wordpress_featured_image_id']) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
     if (body.slug !== undefined) updates.slug = body.slug || null;

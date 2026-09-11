@@ -504,7 +504,6 @@ constructor(baseUrl: string) {
               featured_image_alt: featuredImageAlt,
               wordpress_featured_image_id: wpFeaturedMediaId,
               is_featured: false,
-              is_trending: false,
               popularity_score: 0,
               source: 'wordpress',
               seo_title: seoTitle,

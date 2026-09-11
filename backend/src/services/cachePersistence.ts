@@ -4,7 +4,7 @@ import { buildKey, cacheGet, clearDirty, markDirty } from '../config/redis';
 export type CachedRecord = Record<string, any> & { id: string; _deleted?: boolean };
 
 const SHAYARI_COLUMNS = [
-  'id', 'poet_id', 'form', 'is_trending', 'is_featured',
+  'id', 'poet_id', 'form', 'is_featured',
   'is_poetry_of_the_day', 'popularity_score', 'featured_image_url',
   'featured_image_alt', 'wordpress_featured_image_id', 'slug', 'seo_title',
   'seo_description', 'seo_keywords', 'created_at', 'updated_at'

@@ -12,7 +12,6 @@ interface ShayariFormData {
   slug: string;
   poet_id: string;
   form: string;
-  is_trending: boolean;
   is_featured: boolean;
   is_poetry_of_the_day: boolean;
   popularity_score: number;
@@ -44,7 +43,6 @@ export default function ManageShayariPage() {
     slug: '',
     poet_id: '',
     form: 'sher',
-    is_trending: false,
     is_featured: false,
     is_poetry_of_the_day: false,
     popularity_score: 0,
@@ -235,7 +233,6 @@ export default function ManageShayariPage() {
       slug: '',
       poet_id: '',
       form: 'sher',
-      is_trending: false,
       is_featured: false,
       is_poetry_of_the_day: false,
       popularity_score: 0,
@@ -300,7 +297,6 @@ export default function ManageShayariPage() {
         slug: data.slug || '',
         poet_id: data.poet_id || '',
         form: data.form || 'sher',
-        is_trending: data.is_trending || false,
         is_featured: data.is_featured || false,
         is_poetry_of_the_day: data.is_poetry_of_the_day || false,
         popularity_score: data.popularity_score || 0,
@@ -407,7 +403,6 @@ export default function ManageShayariPage() {
         slug,
         poet_id: formData.poet_id,
         form: formData.form || 'sher',
-        is_trending: formData.is_trending || false,
         is_featured: formData.is_featured || false,
         is_poetry_of_the_day: formData.is_poetry_of_the_day || false,
         popularity_score: formData.popularity_score || 0,
@@ -804,20 +799,7 @@ export default function ManageShayariPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="is_trending"
-                      checked={formData.is_trending}
-                      onChange={(e) => setFormData({ ...formData, is_trending: e.target.checked })}
-                      className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
-                    />
-                    <label htmlFor="is_trending" className="ml-2 text-sm text-gray-700">
-                      Trending
-                    </label>
-                  </div>
-
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex items-center">
                     <input
                       type="checkbox"

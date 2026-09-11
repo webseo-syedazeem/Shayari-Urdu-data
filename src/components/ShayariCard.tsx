@@ -85,11 +85,6 @@ export default function ShayariCard({ shayari, onClick, showStar = false }: Shay
           <span className="px-2 py-1 bg-gray-100 dark:bg-neutral-700 text-gray-600 dark:text-gray-300 rounded text-xs">
             {shayari.form}
           </span>
-          {shayari.is_trending && (
-            <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded text-xs">
-              Trending
-            </span>
-          )}
         </div>
 
           <div className="flex items-center justify-between pt-4 mt-auto border-t border-gray-100 dark:border-neutral-700">

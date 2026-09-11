@@ -18,7 +18,6 @@ interface HomePageProps {
 export default function HomePage({ onNavigate }: HomePageProps) {
   const [featuredShayari, setFeaturedShayari] = useState<Shayari[]>([]);
   const [poetryOfTheDay, setPoetryOfTheDay] = useState<Shayari[]>([]);
-  const [trendingShayari, setTrendingShayari] = useState<Shayari[]>([]);
   const [mostLovedShayari, setMostLovedShayari] = useState<Shayari[]>([]);
   const [topPoets, setTopPoets] = useState<Poet[]>([]);
   const [topTopics, setTopTopics] = useState<Topic[]>([]);
@@ -38,7 +37,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
         setFeaturedShayari(shayariRes.data.filter(s => s.is_featured).slice(0, 3));
         setPoetryOfTheDay(poetryOfTheDayRes.data);
-        setTrendingShayari(shayariRes.data.filter(s => s.is_trending).slice(0, 6));
         setMostLovedShayari(shayariRes.data.sort((a, b) => b.popularity_score - a.popularity_score).slice(0, 6));
         setTopPoets(poetsRes.data);
         setTopTopics(topicsRes.data.slice(0, 6));
@@ -150,19 +148,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           items={poetryOfTheDay}
           onSelect={(shayari) => onNavigate('shayari', getShayariUrl(shayari))}
         />
-
-        <section className="mb-16">
-          <Carousel title="Trending Shayari Today">
-            {trendingShayari.map((shayari) => (
-              <div key={shayari.id} className="w-80 flex-shrink-0">
-                <ShayariCard
-                  shayari={shayari}
-                  onClick={() => onNavigate('shayari', getShayariUrl(shayari))}
-                />
-              </div>
-            ))}
-          </Carousel>
-        </section>
 
         <section className="mb-16">
           <Carousel title="Most Loved This Week">

@@ -46,7 +46,7 @@ router.get('/:id/items', async (req, res) => {
     const { page = '1', pageSize = '50' } = req.query;
     const offset = (Number(page) - 1) * Number(pageSize);
 
-    const { data, error, count } = await supabase.from('collection_items').select(`id, sort_order, shayari:shayari_id (id, form, is_trending, is_featured, poets(name), shayari_language_versions(language, text))`, { count: 'exact' }).eq('collection_id', id).order('sort_order').range(offset, offset + Number(pageSize) - 1);
+    const { data, error, count } = await supabase.from('collection_items').select(`id, sort_order, shayari:shayari_id (id, form, is_featured, poets(name), shayari_language_versions(language, text))`, { count: 'exact' }).eq('collection_id', id).order('sort_order').range(offset, offset + Number(pageSize) - 1);
 
     if (error) throw error;
     res.json({ data: data || [], total: count || 0 });

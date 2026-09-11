@@ -65,7 +65,6 @@ export interface Shayari {
   id: string;
   poet_id: string;
   form: string;
-  is_trending: boolean;
   is_featured: boolean;
   is_poetry_of_the_day: boolean;
   popularity_score: number;
@@ -184,7 +183,7 @@ class ApiService {
     }
   }
 
-  async getShayari(params?: { page?: number; pageSize?: number; language?: string; form?: string; mood?: string; length?: string; topic?: string; sort?: 'trending' | 'mostLoved' | 'latest'; poetId?: string; search?: string; is_trending?: boolean | null; is_featured?: boolean | null }) {
+  async getShayari(params?: { page?: number; pageSize?: number; language?: string; form?: string; mood?: string; length?: string; topic?: string; sort?: 'mostLoved' | 'latest'; poetId?: string; search?: string; is_featured?: boolean | null }) {
     const qs = buildQuery({
       page: params?.page,
       pageSize: params?.pageSize,
@@ -196,7 +195,6 @@ class ApiService {
       sort: params?.sort,
       poetId: params?.poetId,
       q: params?.search,
-      is_trending: params?.is_trending,
       is_featured: params?.is_featured
     });
     return apiFetch<{ data: Shayari[]; pagination: any }>(`/api/shayari${qs}`);

@@ -255,11 +255,6 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
               <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
                 {shayari.form}
               </span>
-              {shayari.is_trending && (
-                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
-                  Trending
-                </span>
-              )}
               {shayari.is_featured && (
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                   Featured

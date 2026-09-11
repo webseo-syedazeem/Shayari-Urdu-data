@@ -141,7 +141,6 @@ async function seed() {
       {
         poet_id: ghalib?.id,
         form: 'sher' as const,
-        is_trending: true,
         popularity_score: 2847,
         featured_image_url: 'https://images.pexels.com/photos/733857/pexels-photo-733857.jpeg?auto=compress&cs=tinysrgb&w=800',
         featured_image_alt: 'Poetry book with tea'
