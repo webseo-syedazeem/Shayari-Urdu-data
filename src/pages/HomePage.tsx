@@ -7,6 +7,7 @@ import CollectionCard from '../components/CollectionCard';
 import Carousel from '../components/Carousel';
 import { PoetryOfTheDay } from '../components/PoetryOfTheDay';
 import { AdSlot } from '../components/ads/AdSlot';
+import AdUnit from '../components/AdUnit';
 import { Seo } from '../components/seo/Seo';
 import { api, Shayari, Poet, Topic, Collection } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
@@ -190,6 +191,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             ))}
           </div>
         </section>
+
+        <AdUnit adSlot="1597242180" adFormat="autorelaxed" />
 
         <section className="mb-16">
           <div className="flex items-center justify-between mb-8">
