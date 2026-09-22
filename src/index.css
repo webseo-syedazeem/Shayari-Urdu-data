@@ -35,4 +35,16 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  .legal-copy p + p {
+    @apply mt-3;
+  }
+
+  .legal-copy strong {
+    @apply font-semibold text-slate-800 dark:text-neutral-100;
+  }
+
+  .legal-copy a {
+    overflow-wrap: anywhere;
+  }
 }

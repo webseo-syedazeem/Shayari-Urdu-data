@@ -1,8 +1,11 @@
-import { Facebook, Instagram, Youtube, Twitter } from 'lucide-react';
+import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <footer className="bg-slate-900 text-white mt-20">
+    <footer className="bg-slate-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <div>
@@ -21,30 +24,21 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
+             
               <li>
-                <a href="#" className="text-gray-300 hover:text-amber-400 transition-colors">
-                  About Us
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-amber-400 transition-colors">
-                  Contact
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-amber-400 transition-colors">
+                <Link to="/privacy-policy" className="text-gray-300 hover:text-amber-400 transition-colors">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-300 hover:text-amber-400 transition-colors">
-                  Terms of Service
-                </a>
+                <Link to="/terms-and-conditions" className="text-gray-300 hover:text-amber-400 transition-colors">
+                  Terms &amp; Conditions
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-300 hover:text-amber-400 transition-colors">
-                  Help & Support
-                </a>
+                <Link to="/dmca-copyright" className="text-gray-300 hover:text-amber-400 transition-colors">
+                  DMCA &amp; Copyright
+                </Link>
               </li>
             </ul>
           </div>
@@ -72,30 +66,29 @@ export default function Footer() {
 
             <div className="flex space-x-4">
               <a
-                href="#"
+                href="https://www.facebook.com/shayariurduweb/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 bg-slate-800 hover:bg-amber-600 rounded-lg flex items-center justify-center transition-colors"
-                aria-label="Facebook"
+                aria-label="Follow ShayariUrdu.com on Facebook"
               >
                 <Facebook size={20} />
               </a>
               <a
-                href="#"
+                href="https://www.instagram.com/shayariurduweb/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 bg-slate-800 hover:bg-amber-600 rounded-lg flex items-center justify-center transition-colors"
-                aria-label="Instagram"
+                aria-label="Follow ShayariUrdu.com on Instagram"
               >
                 <Instagram size={20} />
               </a>
               <a
-                href="#"
+                href="https://x.com/shayariurduweb"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 bg-slate-800 hover:bg-amber-600 rounded-lg flex items-center justify-center transition-colors"
-                aria-label="YouTube"
-              >
-                <Youtube size={20} />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-slate-800 hover:bg-amber-600 rounded-lg flex items-center justify-center transition-colors"
-                aria-label="Twitter"
+                aria-label="Follow ShayariUrdu.com on X"
               >
                 <Twitter size={20} />
               </a>
@@ -104,7 +97,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-slate-800 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2024 ShayariUrdu.com. All rights reserved. Made with love for Urdu poetry.</p>
+          <p>&copy; {currentYear} ShayariUrdu.com. All rights reserved. Made with love for Urdu poetry.</p>
         </div>
       </div>
     </footer>

@@ -250,7 +250,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </section>
 
-        <section className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 md:p-12 text-center text-white">
+        {/* <section className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 md:p-12 text-center text-white">
           <TrendingUp size={48} className="mx-auto mb-6 text-amber-400" />
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Join Our Community
@@ -262,7 +262,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button className="px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-all hover:shadow-lg">
             Get Started Today
           </button>
-        </section>
+        </section> */}
       </div>
     </div>
   );

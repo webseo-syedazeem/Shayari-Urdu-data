@@ -24,9 +24,9 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
   ];
 
   const mainNavLinks = [
-    { name: 'Games', page: 'games' },
+    // { name: 'Games', page: 'games' },
     { name: 'Ebooks', page: 'ebooks' },
-    { name: 'Dictionary', page: 'dictionary' },
+    // { name: 'Dictionary', page: 'dictionary' },
     { name: 'About', page: 'about' },
   ];
 
@@ -154,7 +154,7 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
             </div>
 
             <div className="flex items-center space-x-2 lg:space-x-3">
-              <form onSubmit={handleSearch} className="hidden md:flex items-center">
+              {/* <form onSubmit={handleSearch} className="hidden md:flex items-center">
                 <div className="relative">
                   <input
                     type="text"
@@ -165,7 +165,7 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
                   />
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={16} />
                 </div>
-              </form>
+              </form> */}
 
               <div className="hidden md:flex items-center space-x-1">
                 <button
@@ -177,7 +177,7 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
                   {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                 </button>
 
-                <button
+                {/* <button
                   onClick={() => setBookmarkModalOpen(true)}
                   className="p-2 text-gray-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                   aria-label="Saved shayari"
@@ -192,7 +192,7 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
                   title="Sign in / Register (Coming soon)"
                 >
                   <User size={20} />
-                </button>
+                </button> */}
               </div>
 
               <button

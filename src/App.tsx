@@ -21,6 +21,9 @@ import EbookDetailPage from './pages/EbookDetailPage';
 import DictionaryPage from './pages/DictionaryPage';
 import DictionaryDetailPage from './pages/DictionaryDetailPage';
 import AboutPage from './pages/AboutPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
+import DmcaCopyrightPage from './pages/DmcaCopyrightPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ChatWidget from './components/ChatWidget';
@@ -40,6 +43,9 @@ const pagePaths: Record<string, string> = {
   ebooks: '/ebooks',
   dictionary: '/dictionary',
   about: '/about',
+  'privacy-policy': '/privacy-policy',
+  'terms-and-conditions': '/terms-and-conditions',
+  'dmca-copyright': '/dmca-copyright',
   admin: '/admin',
   'admin-login': '/admin-login',
 };
@@ -285,12 +291,15 @@ function App() {
         <Route path="/shayari/:shayariId" element={<LegacyShayariRoute onNavigate={handleNavigate} />} />
         <Route path="/:year/:month/:day/:slug" element={<ShayariRoute onNavigate={handleNavigate} />} />
         <Route path="/search" element={<SearchPage initialQuery={searchQuery} onNavigate={handleNavigate} />} />
-        <Route path="/games" element={<GamesPage />} />
+        {/* <Route path="/games" element={<GamesPage />} /> */}
         <Route path="/ebooks" element={<EbooksPage onNavigate={handleNavigate} />} />
         <Route path="/ebooks/:ebookId" element={<EbookRoute onNavigate={handleNavigate} />} />
-        <Route path="/dictionary" element={<DictionaryRoute onNavigate={handleNavigate} />} />
-        <Route path="/dictionary/word/:wordId" element={<DictionaryWordRoute onNavigate={handleNavigate} />} />
+        {/* <Route path="/dictionary" element={<DictionaryRoute onNavigate={handleNavigate} />} /> */}
+        {/* <Route path="/dictionary/word/:wordId" element={<DictionaryWordRoute onNavigate={handleNavigate} />} /> */}
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
+        <Route path="/dmca-copyright" element={<DmcaCopyrightPage />} />
         <Route path="/admin-login" element={<AdminLoginPage onLogin={handleAdminLogin} />} />
         <Route
           path="/admin"
