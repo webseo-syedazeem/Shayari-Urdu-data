@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle, X, Send, Settings, Volume2, VolumeX, Bell, BellOff } from 'lucide-react';
 import { useChat, ChatMessage } from '../hooks/useChat';
+import { useNotifications, OPEN_CHAT_EVENT } from '../contexts/NotificationContext';
 
 const STORAGE_KEY = 'chat_username';
 
@@ -10,14 +11,35 @@ function formatTime(iso: string): string {
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [username, setUsername] = useState<string>(() => localStorage.getItem(STORAGE_KEY) ?? '');
   const [nameInput, setNameInput] = useState('');
   const [textInput, setTextInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
 
   const { isConnected, messages, sendMessage, onlineCount } = useChat(username || undefined);
+  const { soundEnabled, popupEnabled, setSoundEnabled, setPopupEnabled } = useNotifications();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  // Let toast clicks (fired from anywhere on the site) open this widget.
+  useEffect(() => {
+    const openChat = () => setIsOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, openChat);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, openChat);
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [settingsOpen]);
 
   useEffect(() => {
     if (!isOpen && messages.length > prevMsgCount.current) {
@@ -91,7 +113,7 @@ export default function ChatWidget() {
           {/* Header */}
           <div
             style={{
-              backgroundColor: '#1E3A5F',
+              backgroundColor: '#2B4C70',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -100,14 +122,55 @@ export default function ChatWidget() {
             }}
           >
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '15px' }}>Poetry Chat</div>
-              <div style={{ color: '#94B8D8', fontSize: '11px', marginTop: '1px' }}>ShayariUrdu.com</div>
+              <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '14px' }}>Poetry Chat</div>
+              <div style={{ color: '#9BB8D3', fontSize: '11px', marginTop: '1px' }}>ShayariUrdu.com</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#94B8D8' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#4ADE80', display: 'inline-block' }} />
                 {onlineCount} online
               </span>
+              <div style={{ position: 'relative' }} ref={settingsRef}>
+                <button
+                  onClick={() => setSettingsOpen((v) => !v)}
+                  aria-label="Notification settings"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94B8D8', display: 'flex', alignItems: 'center', padding: '2px' }}
+                >
+                  <Settings size={17} />
+                </button>
+                {settingsOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: 0,
+                      width: '220px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '10px',
+                      border: '1px solid #E5E7EB',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                      padding: '10px',
+                      zIndex: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 4px 8px' }}>
+                      Notifications
+                    </div>
+                    <SettingRow
+                      icon={soundEnabled ? <Volume2 size={15} color="#1E3A5F" /> : <VolumeX size={15} color="#9CA3AF" />}
+                      label="Sound Notifications"
+                      checked={soundEnabled}
+                      onChange={setSoundEnabled}
+                    />
+                    <SettingRow
+                      icon={popupEnabled ? <Bell size={15} color="#1E3A5F" /> : <BellOff size={15} color="#9CA3AF" />}
+                      label="Popup Notifications"
+                      checked={popupEnabled}
+                      onChange={setPopupEnabled}
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setIsOpen(false)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94B8D8', display: 'flex', alignItems: 'center', padding: '2px' }}
@@ -297,43 +360,83 @@ export default function ChatWidget() {
       )}
 
       {/* Floating Button */}
+      <style>{`
+        .shayari-chat-fab {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 9px 15px;
+          border-radius: 999px;
+          border: none;
+          background-color: #2B4C70;
+          color: rgba(255, 255, 255, 0.94);
+          font-family: system-ui, -apple-system, sans-serif;
+          font-size: 12.5px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+          cursor: pointer;
+          box-shadow: 0 2px 10px rgba(30, 58, 95, 0.2);
+          transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .shayari-chat-fab:hover {
+          transform: translateY(-1px);
+          background-color: #315579;
+          box-shadow: 0 4px 14px rgba(30, 58, 95, 0.26);
+        }
+        .shayari-chat-fab:active {
+          transform: translateY(0);
+        }
+        .shayari-chat-fab__label {
+          white-space: nowrap;
+        }
+        @media (max-width: 480px) {
+          .shayari-chat-fab {
+            padding: 9px 13px;
+          }
+          .shayari-chat-fab__label--full {
+            display: none;
+          }
+          .shayari-chat-fab__label--short {
+            display: inline;
+          }
+        }
+        .shayari-chat-fab__label--short {
+          display: none;
+        }
+      `}</style>
       <button
         onClick={() => setIsOpen((v) => !v)}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 9999,
-          width: '54px',
-          height: '54px',
-          borderRadius: '50%',
-          backgroundColor: '#1E3A5F',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(30,58,95,0.35)',
-        }}
+        className="shayari-chat-fab"
       >
-        {isOpen ? <X size={22} color="#ffffff" /> : <MessageCircle size={22} color="#ffffff" />}
+        {isOpen ? <X size={15} strokeWidth={2} /> : <MessageCircle size={15} strokeWidth={2} />}
+        <span className="shayari-chat-fab__label shayari-chat-fab__label--full">
+          {isOpen ? 'Close Chat' : 'Shayari Chat Room'}
+        </span>
+        <span className="shayari-chat-fab__label shayari-chat-fab__label--short">
+          {isOpen ? 'Close' : 'Chat'}
+        </span>
         {!isOpen && unreadCount > 0 && (
           <span
             style={{
               position: 'absolute',
               top: '-4px',
               right: '-4px',
-              width: '20px',
-              height: '20px',
+              width: '16px',
+              height: '16px',
               borderRadius: '50%',
               backgroundColor: '#EF4444',
               color: '#ffffff',
-              fontSize: '10px',
-              fontWeight: 700,
+              fontSize: '9px',
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 0 0 2px #2B4C70',
             }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -341,5 +444,71 @@ export default function ChatWidget() {
         )}
       </button>
     </>
+  );
+}
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '34px',
+        height: '20px',
+        borderRadius: '999px',
+        border: 'none',
+        cursor: 'pointer',
+        backgroundColor: checked ? '#1E3A5F' : '#D1D5DB',
+        position: 'relative',
+        flexShrink: 0,
+        transition: 'background-color 0.15s ease',
+        padding: 0,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: '2px',
+          left: checked ? '16px' : '2px',
+          width: '16px',
+          height: '16px',
+          borderRadius: '50%',
+          backgroundColor: '#ffffff',
+          transition: 'left 0.15s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }}
+      />
+    </button>
+  );
+}
+
+function SettingRow({
+  icon,
+  label,
+  checked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px',
+        padding: '7px 4px',
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#374151', fontWeight: 500 }}>
+        {icon}
+        {label}
+      </span>
+      <ToggleSwitch checked={checked} onChange={onChange} />
+    </div>
   );
 }

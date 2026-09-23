@@ -27,6 +27,7 @@ import DmcaCopyrightPage from './pages/DmcaCopyrightPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ChatWidget from './components/ChatWidget';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { getShayariUrl } from './utils/shayariUrl';
 import { api } from './services/api';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001';
@@ -325,14 +326,16 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-neutral-900 transition-colors">
-      <Header currentPage={currentPage} onNavigate={handleNavigate} onSearch={handleSearch} />
-      <AdSlot placement="header" pageScope="global" />
-      <main className="flex-1">{renderRoutes()}</main>
-      <AdSlot placement="footer" pageScope="global" />
-      <Footer />
-      <ChatWidget />
-    </div>
+    <NotificationProvider>
+      <div className="min-h-screen flex flex-col bg-white dark:bg-neutral-900 transition-colors">
+        <Header currentPage={currentPage} onNavigate={handleNavigate} onSearch={handleSearch} />
+        <AdSlot placement="header" pageScope="global" />
+        <main className="flex-1">{renderRoutes()}</main>
+        <AdSlot placement="footer" pageScope="global" />
+        <Footer />
+        <ChatWidget />
+      </div>
+    </NotificationProvider>
   );
 }
 
