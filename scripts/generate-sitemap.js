@@ -1,6 +1,8 @@
 // Generates public/sitemap.xml (+ public/robots.txt) from live Supabase data.
 // Runs at build time (see package.json "build" script) so the sitemap stays
 // in sync with the database without a separate deploy/cron step.
+import dotenv from 'dotenv';
+dotenv.config();
 import { createClient } from '@supabase/supabase-js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
