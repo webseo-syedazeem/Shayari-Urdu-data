@@ -16,6 +16,8 @@ export default function ChatWidget() {
   const [nameInput, setNameInput] = useState('');
   const [textInput, setTextInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
 
   const { isConnected, messages, sendMessage, onlineCount } = useChat(username || undefined);
   const { soundEnabled, popupEnabled, setSoundEnabled, setPopupEnabled } = useNotifications();
@@ -74,11 +76,21 @@ export default function ChatWidget() {
     setNameInput('');
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = textInput.trim();
-    if (!trimmed || !username) return;
-    sendMessage(username, trimmed);
-    setTextInput('');
+    if (!trimmed || !username || isSending) return;
+
+    setIsSending(true);
+    setSendError(false);
+
+    try {
+      await sendMessage(username, trimmed);
+      setTextInput('');
+    } catch {
+      setSendError(true);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -317,7 +329,7 @@ export default function ChatWidget() {
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
+                    onChange={(e) => { setTextInput(e.target.value); setSendError(false); }}
                     onKeyDown={handleKeyDown}
                     placeholder="Type a message..."
                     disabled={!isConnected}
@@ -325,7 +337,7 @@ export default function ChatWidget() {
                     style={{
                       flex: 1,
                       borderRadius: '999px',
-                      border: '1px solid #D1D5DB',
+                      border: sendError ? '1px solid #EF4444' : '1px solid #D1D5DB',
                       backgroundColor: '#F9FAFB',
                       padding: '9px 16px',
                       fontSize: '13px',
@@ -336,14 +348,14 @@ export default function ChatWidget() {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!textInput.trim() || !isConnected}
+                    disabled={!textInput.trim() || !isConnected || isSending}
                     style={{
                       width: '38px',
                       height: '38px',
                       borderRadius: '50%',
-                      backgroundColor: textInput.trim() && isConnected ? '#1E3A5F' : '#D1D5DB',
+                      backgroundColor: textInput.trim() && isConnected && !isSending ? '#1E3A5F' : '#D1D5DB',
                       border: 'none',
-                      cursor: textInput.trim() && isConnected ? 'pointer' : 'not-allowed',
+                      cursor: textInput.trim() && isConnected && !isSending ? 'pointer' : 'not-allowed',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -353,6 +365,27 @@ export default function ChatWidget() {
                     <Send size={16} color="#ffffff" />
                   </button>
                 </div>
+                {sendError && (
+                  <div style={{ fontSize: '11px', color: '#EF4444', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Message failed to send.</span>
+                    <button
+                      onClick={handleSend}
+                      disabled={isSending}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: '#EF4444',
+                        textDecoration: 'underline',
+                        cursor: isSending ? 'default' : 'pointer',
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

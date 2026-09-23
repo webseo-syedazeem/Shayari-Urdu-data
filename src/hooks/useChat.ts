@@ -35,7 +35,7 @@ export function useChat(username?: string): UseChatReturn {
         .from('chat_messages')
         .select('id, username, message, room, created_at')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(20);
 
       if (!cancelled && data) {
         const history: ChatMessage[] = data.reverse().map((row) => ({ ...row, isHistory: true }));
@@ -109,9 +109,13 @@ export function useChat(username?: string): UseChatReturn {
   }, [username]);
 
   const sendMessage = async (msgUsername: string, message: string) => {
-    await supabase
+    const { error } = await supabase
       .from('chat_messages')
       .insert({ username: msgUsername, message, room: 'general' });
+
+    if (error) {
+      throw new Error(error.message);
+    }
   };
 
   return { messages, sendMessage, onlineCount, isConnected };
