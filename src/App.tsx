@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { Seo } from './components/seo/Seo';
 import { AdSlot } from './components/ads/AdSlot';
 import HomePage from './pages/HomePage';
 import ExplorePage from './pages/ExplorePage';
@@ -328,11 +329,18 @@ function App() {
   return (
     <NotificationProvider>
       <div className="min-h-screen flex flex-col bg-white dark:bg-neutral-900 transition-colors">
+        {/* Site-wide default tags. Any page that renders its own <Seo> further
+            down the tree overrides these (react-helmet-async resolves same-key
+            tags by last-rendered-wins), so every route ends up with Helmet-
+            managed meta tags even if that page hasn't been given a specific
+            <Seo> call yet. */}
+        <Seo />
         <Header currentPage={currentPage} onNavigate={handleNavigate} onSearch={handleSearch} />
         <AdSlot placement="header" pageScope="global" />
         <main className="flex-1">{renderRoutes()}</main>
         <AdSlot placement="footer" pageScope="global" />
         <Footer />
+        <div className="h-20 sm:h-0" aria-hidden="true" />
         <ChatWidget />
       </div>
     </NotificationProvider>

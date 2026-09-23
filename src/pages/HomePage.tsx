@@ -144,7 +144,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       <AdSlot placement="home_hero_top" pageScope="home" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-16 sm:py-16">
         <PoetryOfTheDay
           items={poetryOfTheDay}
           onSelect={(shayari) => onNavigate('shayari', getShayariUrl(shayari))}

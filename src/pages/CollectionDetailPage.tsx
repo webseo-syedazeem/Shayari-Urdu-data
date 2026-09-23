@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookMarked } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
+import { Seo, generateCollectionSeo } from '../components/seo/Seo';
 import { api, Collection, Shayari } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
 
@@ -61,8 +62,16 @@ export default function CollectionDetailPage({ collectionId, onNavigate }: Colle
     );
   }
 
+  const seoData = generateCollectionSeo(collection);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        ogImage={seoData.ogImage}
+      />
       <div className="relative h-80 overflow-hidden">
         <img
           src={collection.cover_image || 'https://images.pexels.com/photos/1029141/pexels-photo-1029141.jpeg?auto=compress&cs=tinysrgb&w=800'}

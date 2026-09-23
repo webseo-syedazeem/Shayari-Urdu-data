@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:backend": "cd backend && npm run dev",
-    "build": "vite build",
+    "build": "node scripts/generate-sitemap.js && vite build",
     "build:backend": "cd backend && npm run build",
+    "sitemap": "node scripts/generate-sitemap.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Heart, Bookmark, Share2, Copy, Check, MessageCircle, BookOpen } from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
+import { Seo, generateShayariSeo } from '../components/seo/Seo';
 import { api, Shayari } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
 
@@ -139,6 +140,7 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
   }
 
   const poet = shayari.poets;
+  const seoData = generateShayariSeo(shayari);
   const parsedScripts = parseShayariText(shayari.seo_description || '');
   const availableTabs = ([
     parsedScripts.roman ? 'roman' : null,
@@ -182,6 +184,14 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        ogImage={seoData.ogImage}
+        ogType="article"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
           <div className="w-full h-64 md:h-[28rem] overflow-hidden bg-slate-100">

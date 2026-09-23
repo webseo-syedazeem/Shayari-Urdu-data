@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import ShayariCard from '../components/ShayariCard';
 import FilterBar, { FilterState } from '../components/FilterBar';
+import { Seo, generateTopicSeo } from '../components/seo/Seo';
 import { api, Topic, Shayari } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
 
@@ -71,8 +72,15 @@ export default function TopicDetailPage({ topicSlug, onNavigate }: TopicDetailPa
     return true;
   });
 
+  const seoData = generateTopicSeo(topic);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+      />
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">

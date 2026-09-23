@@ -396,12 +396,14 @@ export default function ChatWidget() {
       <style>{`
         .shayari-chat-fab {
           position: fixed;
-          bottom: 20px;
-          right: 20px;
+          bottom: max(20px, calc(env(safe-area-inset-bottom) + 16px));
+          right: max(20px, calc(env(safe-area-inset-right) + 16px));
           z-index: 9999;
           display: flex;
           align-items: center;
           gap: 6px;
+          min-height: 44px;
+          box-sizing: border-box;
           padding: 9px 15px;
           border-radius: 999px;
           border: none;
@@ -426,9 +428,15 @@ export default function ChatWidget() {
         .shayari-chat-fab__label {
           white-space: nowrap;
         }
+        .shayari-chat-fab__label--short {
+          display: none;
+        }
         @media (max-width: 480px) {
           .shayari-chat-fab {
-            padding: 9px 13px;
+            bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
+            right: max(16px, calc(env(safe-area-inset-right) + 12px));
+            min-height: 48px;
+            padding: 10px 16px;
           }
           .shayari-chat-fab__label--full {
             display: none;
@@ -436,9 +444,6 @@ export default function ChatWidget() {
           .shayari-chat-fab__label--short {
             display: inline;
           }
-        }
-        .shayari-chat-fab__label--short {
-          display: none;
         }
       `}</style>
       <button

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, ArrowRight } from 'lucide-react';
+import { Seo, generateDictionarySeo } from '../components/seo/Seo';
 import { api, DictionaryEntry, Shayari } from '../services/api';
 import { getShayariUrl } from '../utils/shayariUrl';
 
@@ -114,8 +115,15 @@ export default function DictionaryDetailPage({ wordId, onNavigate }: DictionaryD
     return entry.word_urdu || entry.word_roman || entry.word_english || entry.word_key;
   };
 
+  const seoData = generateDictionarySeo(entry);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+      />
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <button

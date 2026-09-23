@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Download, BookOpen, FileText, User } from 'lucide-react';
+import { Seo, generateEbookSeo } from '../components/seo/Seo';
 import { api, Ebook } from '../services/api';
 
 interface EbookDetailPageProps {
@@ -99,9 +100,16 @@ export default function EbookDetailPage({ ebookId, onNavigate }: EbookDetailPage
 
   const title = ebook.titles?.roman_urdu || ebook.titles?.urdu || ebook.titles?.english || 'Untitled';
   const description = ebook.descriptions?.roman_urdu || ebook.descriptions?.english || ebook.descriptions?.urdu || '';
+  const seoData = generateEbookSeo(ebook);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        ogImage={seoData.ogImage}
+      />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <button
           onClick={() => onNavigate('ebooks')}

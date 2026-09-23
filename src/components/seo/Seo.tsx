@@ -12,7 +12,9 @@ interface SeoProps {
 const DEFAULT_TITLE = 'ShayariUrdu.com – Urdu, Roman Urdu, Hindi & English Shayari';
 const DEFAULT_DESCRIPTION = 'Discover beautiful Urdu, Roman Urdu, Hindi and English shayari, ghazals, nazms and poetry quotes by your favorite poets. Browse by topics, moods, and collections.';
 const DEFAULT_KEYWORDS = 'urdu shayari, roman urdu shayari, hindi shayari, poetry, quotes, ghazal, nazm, sher';
-const DEFAULT_OG_IMAGE = '/og-image.png';
+// TODO: swap for a proper 1200x630 PNG/JPG once one exists — favicon.webp is
+// square and WebP, which some social platforms crop oddly or fail to render.
+const DEFAULT_OG_IMAGE = '/favicon.webp';
 const SITE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://shayariurdu.com';
 
 export function Seo({
@@ -61,28 +63,43 @@ export function Seo({
   );
 }
 
-export function generateShayariSeo(shayari: any) {
-  if (shayari.seo_title || shayari.seo_description || shayari.seo_keywords) {
-    return {
-      title: shayari.seo_title || undefined,
-      description: shayari.seo_description || undefined,
-      keywords: shayari.seo_keywords || undefined,
-      ogImage: shayari.featured_image_url || undefined
-    };
-  }
+function cleanForMetaDescription(text: string, maxLength = 157): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  if (collapsed.length <= maxLength) return collapsed;
+  return `${collapsed.slice(0, maxLength).trimEnd()}...`;
+}
 
-  const firstVersion = shayari.shayari_language_versions?.[0];
-  const text = firstVersion?.text || '';
-  const words = text.split(' ').slice(0, 12).join(' ');
-  const truncatedText = text.length > 160 ? text.substring(0, 157) + '...' : text;
+export function generateShayariSeo(shayari: any) {
+  const versions: Array<{ language: string; text: string }> = shayari.shayari_language_versions || [];
+  const romanVersion = versions.find((v) => v.language === 'roman_urdu' || v.language === 'roman');
+  const bodyVersion = romanVersion || versions[0];
+  const bodyText = bodyVersion?.text || '';
 
   const poetName = shayari.poets?.name || 'Unknown';
   const form = shayari.form || 'Shayari';
 
+  // seo_title is a clean, purpose-written field — use it as-is when present.
+  const title = shayari.seo_title
+    || (bodyText ? `${bodyText.split(/\s+/).slice(0, 12).join(' ')}...` : `${form} by ${poetName}`);
+
+  // seo_description on this table actually stores the raw multi-line, multi-script
+  // poem text (used elsewhere to render the page body) — never pass it straight
+  // into a meta description tag. Derive a clean single-line summary from the
+  // parsed language version text instead, falling back to seo_description itself
+  // (cleaned) only if no language version text is available at all.
+  const description = bodyText
+    ? cleanForMetaDescription(bodyText)
+    : shayari.seo_description
+      ? cleanForMetaDescription(shayari.seo_description)
+      : `Beautiful ${form.toLowerCase()} by ${poetName}`;
+
+  const keywords = shayari.seo_keywords || `${poetName}, ${form}, urdu shayari, poetry`;
+
   return {
-    title: words ? `${words}...` : `${form} by ${poetName}`,
-    description: truncatedText || `Beautiful ${form.toLowerCase()} by ${poetName}`,
-    keywords: `${poetName}, ${form}, urdu shayari, poetry`,
+    title,
+    description,
+    keywords,
+    canonical: shayari.canonical_url || undefined,
     ogImage: shayari.featured_image_url || undefined
   };
 }

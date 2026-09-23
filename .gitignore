@@ -24,3 +24,8 @@ dist-ssr
 
 # Local WordPress media archive (deployed separately, not committed)
 /backend/public/
+
+# Generated at build time by scripts/generate-sitemap.js (see package.json "build")
+/public/sitemap.xml
+/public/sitemap-*.xml
+/public/robots.txt
