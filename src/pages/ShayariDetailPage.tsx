@@ -273,7 +273,7 @@ export default function ShayariDetailPage({ shayariSlug, shayariId, onNavigate }
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 pt-6 border-t border-gray-200">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 pt-6 border-t border-gray-200">
             <button
               onClick={() => setLiked(!liked)}
               className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${

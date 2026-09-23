@@ -10,6 +10,14 @@
   body {
     @apply antialiased;
   }
+
+  /* AdSense Auto Ads injects a zero-width, margin:auto <ins> holding an
+     absolutely positioned fixed-width (e.g. 1200px) iframe, which pushes the
+     page wider than the viewport. Contain it at its full-width wrapper. */
+  .google-auto-placed {
+    max-width: 100%;
+    overflow-x: clip;
+  }
 }
 
 @layer utilities {
