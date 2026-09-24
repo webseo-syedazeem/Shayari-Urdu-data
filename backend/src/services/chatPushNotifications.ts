@@ -67,6 +67,11 @@ function messagePreview(message: string): string {
   return `${normalized.slice(0, MESSAGE_PREVIEW_LENGTH - 1).trimEnd()}\u2026`;
 }
 
+function tokenPreview(token: string): string {
+  if (token.length <= 18) return token;
+  return `${token.slice(0, 14)}...${token.slice(-6)}`;
+}
+
 async function removeTokens(tokens: string[]): Promise<number> {
   const uniqueTokens = [...new Set(tokens)];
   if (uniqueTokens.length === 0) return 0;
@@ -99,7 +104,22 @@ async function loadRecipientTokens(sender: string): Promise<string[]> {
     if (page.length < pageSize) break;
   }
 
-  return [...new Set(tokens)].filter((token) => EXPO_TOKEN_PATTERN.test(token));
+  const uniqueTokens = [...new Set(tokens)];
+  const invalidTokens = uniqueTokens.filter((token) => !EXPO_TOKEN_PATTERN.test(token));
+  if (invalidTokens.length > 0) {
+    console.warn('[chat-push] Ignoring malformed Expo push tokens', {
+      count: invalidTokens.length,
+      tokens: invalidTokens.map(tokenPreview)
+    });
+  }
+
+  const validTokens = uniqueTokens.filter((token) => EXPO_TOKEN_PATTERN.test(token));
+  console.log('[chat-push] Recipient query complete', {
+    sender,
+    enabledUniqueTokens: uniqueTokens.length,
+    validRecipientTokens: validTokens.length
+  });
+  return validTokens;
 }
 
 async function sendChatPushes(
@@ -111,8 +131,25 @@ async function sendChatPushes(
   let sent = 0;
   let removed = 0;
 
-  for (const tokenBatch of chunks(tokens, MAX_EXPO_BATCH_SIZE)) {
+  const tokenBatches = chunks(tokens, MAX_EXPO_BATCH_SIZE);
+  for (const [batchIndex, tokenBatch] of tokenBatches.entries()) {
     try {
+      const messages = tokenBatch.map((to) => ({
+        to,
+        title: sender,
+        body: messagePreview(message),
+        data: { url: '/chat', type: 'chat_message', messageId: messageId ?? null },
+        sound: 'default',
+        channelId: 'chat-messages',
+        priority: 'high'
+      }));
+      console.log('[chat-push] Sending Expo push request', {
+        messageId: messageId ?? null,
+        batch: batchIndex + 1,
+        batches: tokenBatches.length,
+        payloadCount: messages.length
+      });
+
       const response = await fetch(EXPO_PUSH_URL, {
         method: 'POST',
         signal: AbortSignal.timeout(EXPO_REQUEST_TIMEOUT_MS),
@@ -120,15 +157,7 @@ async function sendChatPushes(
           Accept: 'application/json',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(tokenBatch.map((to) => ({
-          to,
-          title: sender,
-          body: messagePreview(message),
-          data: { url: '/chat', type: 'chat_message', messageId: messageId ?? null },
-          sound: 'default',
-          channelId: 'chat-messages',
-          priority: 'high'
-        })))
+        body: JSON.stringify(messages)
       });
 
       if (!response.ok) {
@@ -139,7 +168,14 @@ async function sendChatPushes(
       }
 
       const result = await response.json() as { data?: ExpoTicket[] };
+      console.log('[chat-push] Expo send response', JSON.stringify(result));
       const tickets = Array.isArray(result.data) ? result.data : [];
+      if (tickets.length !== tokenBatch.length) {
+        console.warn('[chat-push] Expo ticket count did not match request payload count', {
+          requested: tokenBatch.length,
+          received: tickets.length
+        });
+      }
       const successfulTickets: PushTicketRow[] = [];
       const unregisteredTokens: string[] = [];
 
@@ -151,9 +187,16 @@ async function sendChatPushes(
           successfulTickets.push({ ticket_id: ticket.id, expo_push_token: token });
           sent += 1;
         } else if (ticket.details?.error === 'DeviceNotRegistered') {
+          console.warn('[chat-push] Expo reports an unregistered/expired device token', {
+            token: tokenPreview(token),
+            ticket
+          });
           unregisteredTokens.push(token);
         } else {
-          console.error('[chat-push] Expo ticket error', ticket);
+          console.error('[chat-push] Expo ticket error', {
+            token: tokenPreview(token),
+            ticket
+          });
         }
       });
 
@@ -209,6 +252,7 @@ async function processPushReceipts(): Promise<{ checked: number; removed: number
   }
 
   const result = await response.json() as { data?: Record<string, ExpoReceipt> };
+  console.log('[chat-push] Expo receipts response', JSON.stringify(result));
   const tokenByTicket = new Map(
     pending.map((ticket) => [ticket.ticket_id, ticket.expo_push_token])
   );
@@ -219,7 +263,14 @@ async function processPushReceipts(): Promise<{ checked: number; removed: number
     completedTicketIds.push(ticketId);
     if (receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
       const token = tokenByTicket.get(ticketId);
-      if (token) unregisteredTokens.push(token);
+      if (token) {
+        console.warn('[chat-push] Expo receipt reports an unregistered/expired device token', {
+          ticketId,
+          token: tokenPreview(token),
+          receipt
+        });
+        unregisteredTokens.push(token);
+      }
     } else if (receipt.status === 'error') {
       console.error('[chat-push] Expo receipt error', { ticketId, ...receipt });
     }
@@ -258,6 +309,12 @@ async function handleChatInsert(record: ChatMessageRecord): Promise<void> {
   const sender = String(record.username ?? record.user_name ?? '').trim();
   const message = String(record.message ?? record.message_text ?? '').trim();
   const messageId = typeof record.id === 'string' ? record.id : undefined;
+
+  console.log('[chat-push] chat_messages INSERT received', {
+    messageId: messageId ?? null,
+    sender: sender || null,
+    messageLength: message.length
+  });
 
   if (!sender || !message) {
     console.warn('[chat-push] Ignoring chat INSERT without a sender or message body');
@@ -318,6 +375,11 @@ async function connectRealtime(): Promise<void> {
   channel = nextChannel;
   nextChannel.subscribe((status, error) => {
     if (stopping || channel !== nextChannel) return;
+
+    console.log('[chat-push] Realtime subscription status', {
+      status,
+      error: error?.message ?? null
+    });
 
     if (status === 'SUBSCRIBED') {
       clearReconnectTimer();
