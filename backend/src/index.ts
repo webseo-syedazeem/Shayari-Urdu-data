@@ -19,6 +19,7 @@ import chatRouter from './routes/chat';
 import aiImageSettingsRouter from './routes/aiImageSettings';
 import internalPersistRouter from './routes/internalPersist';
 import { startCacheFlusher } from './scripts/cacheFlusher';
+import { startChatPushNotifications } from './services/chatPushNotifications';
 
 dotenv.config();
 
@@ -57,9 +58,33 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
+let stopChatPushNotifications: () => Promise<void> = async () => undefined;
+
+const server = app.listen(PORT, () => {
   console.log(`\nBackend running on http://localhost:${PORT}`);
   console.log(`Supabase URL: ${process.env.SUPABASE_URL}`);
   console.log(process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Using: service_role key configured' : 'Using: anon key (no service role set)');
   startCacheFlusher();
+  stopChatPushNotifications = startChatPushNotifications();
 });
+
+let shuttingDown = false;
+const shutdown = (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\nReceived ${signal}; shutting down backend`);
+
+  void stopChatPushNotifications()
+    .catch((error) => console.error('[chat-push] Failed to stop cleanly', error))
+    .finally(() => {
+      server.close((error) => {
+        if (error) {
+          console.error('Backend shutdown failed', error);
+          process.exitCode = 1;
+        }
+      });
+    });
+};
+
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));
