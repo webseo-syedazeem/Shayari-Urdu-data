@@ -294,8 +294,8 @@ function App() {
         <Route path="/:year/:month/:day/:slug" element={<ShayariRoute onNavigate={handleNavigate} />} />
         <Route path="/search" element={<SearchPage initialQuery={searchQuery} onNavigate={handleNavigate} />} />
         {/* <Route path="/games" element={<GamesPage />} /> */}
-        <Route path="/ebooks" element={<EbooksPage onNavigate={handleNavigate} />} />
-        <Route path="/ebooks/:ebookId" element={<EbookRoute onNavigate={handleNavigate} />} />
+        {/* <Route path="/ebooks" element={<EbooksPage onNavigate={handleNavigate} />} /> */}
+        {/* <Route path="/ebooks/:ebookId" element={<EbookRoute onNavigate={handleNavigate} />} /> */}
         {/* <Route path="/dictionary" element={<DictionaryRoute onNavigate={handleNavigate} />} /> */}
         {/* <Route path="/dictionary/word/:wordId" element={<DictionaryWordRoute onNavigate={handleNavigate} />} /> */}
         <Route path="/about" element={<AboutPage />} />

@@ -25,7 +25,7 @@ export default function Header({ currentPage, onNavigate, onSearch }: HeaderProp
 
   const mainNavLinks = [
     // { name: 'Games', page: 'games' },
-    { name: 'Ebooks', page: 'ebooks' },
+    // { name: 'Ebooks', page: 'ebooks' },
     // { name: 'Dictionary', page: 'dictionary' },
     { name: 'About', page: 'about' },
   ];
