@@ -31,6 +31,7 @@ interface NotificationContextValue {
   popupEnabled: boolean;
   setSoundEnabled: (value: boolean) => void;
   setPopupEnabled: (value: boolean) => void;
+  showLocalNotification: (message: string) => void;
   toasts: ToastItem[];
   dismissToast: (id: string) => void;
 }
@@ -70,6 +71,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  const showLocalNotification = useCallback((message: string) => {
+    const toast: ToastItem = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      username: 'Poetry Chat',
+      message: truncate(message, 140),
+    };
+    setToasts((prev) => [...prev, toast]);
+    setTimeout(() => dismissToast(toast.id), TOAST_LIFETIME_MS);
+  }, [dismissToast]);
 
   // Unlock audio playback on first user interaction (autoplay restriction workaround)
   useEffect(() => {
@@ -165,7 +176,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotificationContext.Provider
-      value={{ soundEnabled, popupEnabled, setSoundEnabled, setPopupEnabled, toasts, dismissToast }}
+      value={{
+        soundEnabled,
+        popupEnabled,
+        setSoundEnabled,
+        setPopupEnabled,
+        showLocalNotification,
+        toasts,
+        dismissToast,
+      }}
     >
       {children}
       <ToastStack toasts={toasts} onDismiss={dismissToast} onClick={handleToastClick} />

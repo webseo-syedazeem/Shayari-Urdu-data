@@ -3,8 +3,13 @@ import { MessageCircle, X, Send, Settings, Volume2, VolumeX, Bell, BellOff } fro
 import { useChat, ChatMessage } from '../hooks/useChat';
 import { useNotifications, OPEN_CHAT_EVENT } from '../contexts/NotificationContext';
 import { getChatUserId } from '../lib/chatUserId';
+import {
+  getNameChangesRemaining,
+  renameChatUsername,
+} from '../lib/chatUserProfile';
 
 const STORAGE_KEY = 'chat_username';
+const NO_NAME_CHANGES_MESSAGE = 'You\'ve used all 3 name changes and can\'t change your name again.';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -16,6 +21,10 @@ export default function ChatWidget() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [username, setUsername] = useState<string>(() => localStorage.getItem(STORAGE_KEY) ?? '');
   const [nameInput, setNameInput] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [nameChangesRemaining, setNameChangesRemaining] = useState<number | null>(null);
+  const [nameError, setNameError] = useState('');
   const [textInput, setTextInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSending, setIsSending] = useState(false);
@@ -25,7 +34,13 @@ export default function ChatWidget() {
     username || undefined,
     userId,
   );
-  const { soundEnabled, popupEnabled, setSoundEnabled, setPopupEnabled } = useNotifications();
+  const {
+    soundEnabled,
+    popupEnabled,
+    setSoundEnabled,
+    setPopupEnabled,
+    showLocalNotification,
+  } = useNotifications();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -73,12 +88,65 @@ export default function ChatWidget() {
     }
   }, [messages]);
 
-  const handleSetUsername = () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) return;
-    localStorage.setItem(STORAGE_KEY, trimmed);
-    setUsername(trimmed);
-    setNameInput('');
+  const trimmedName = nameInput.trim();
+  const nameValid = trimmedName.length >= 2 && trimmedName.length <= 30;
+  const nameChanged = !isRenaming || trimmedName !== username;
+  const canSaveName = nameValid && nameChanged && !isSavingName;
+
+  const handleSetUsername = async () => {
+    if (!canSaveName) return;
+
+    if (!isRenaming) {
+      localStorage.setItem(STORAGE_KEY, trimmedName);
+      setUsername(trimmedName);
+      setNameInput('');
+      return;
+    }
+
+    setIsSavingName(true);
+    setNameError('');
+    try {
+      const result = await renameChatUsername(userId, trimmedName);
+      setNameChangesRemaining(result.remaining);
+
+      if (!result.success) {
+        setNameError(NO_NAME_CHANGES_MESSAGE);
+        showLocalNotification(NO_NAME_CHANGES_MESSAGE);
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEY, trimmedName);
+      setUsername(trimmedName);
+      setNameInput('');
+      setIsRenaming(false);
+      showLocalNotification(
+        `Name changed. You have ${result.remaining} name change${result.remaining === 1 ? '' : 's'} left.`,
+      );
+    } catch {
+      setNameError('Your name could not be changed. Please try again.');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleBeginRename = async () => {
+    if (isSavingName) return;
+    setIsSavingName(true);
+    setNameError('');
+    try {
+      const remaining = await getNameChangesRemaining(userId);
+      setNameChangesRemaining(remaining);
+      if (remaining <= 0) {
+        showLocalNotification(NO_NAME_CHANGES_MESSAGE);
+        return;
+      }
+      setNameInput(username);
+      setIsRenaming(true);
+    } catch {
+      showLocalNotification('Name-change information could not be loaded. Please try again.');
+    } finally {
+      setIsSavingName(false);
+    }
   };
 
   const handleSend = async () => {
@@ -103,7 +171,7 @@ export default function ChatWidget() {
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSetUsername();
+    if (e.key === 'Enter') void handleSetUsername();
   };
 
   return (
@@ -198,18 +266,26 @@ export default function ChatWidget() {
           </div>
 
           {/* Username Setup */}
-          {!username ? (
+          {!username || isRenaming ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', gap: '16px', backgroundColor: '#ffffff' }}>
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <MessageCircle size={26} color="#1E3A5F" />
               </div>
               <p style={{ fontSize: '14px', fontWeight: 600, color: '#1F2937', textAlign: 'center', margin: 0 }}>
-                Enter your name to join the chat
+                {isRenaming ? 'Change your chat name' : 'Enter your name to join the chat'}
               </p>
+              {isRenaming && nameChangesRemaining !== null && (
+                <p style={{ fontSize: '12px', color: '#6B7280', textAlign: 'center', margin: '-8px 0 0' }}>
+                  {nameChangesRemaining} of 3 name changes remaining
+                </p>
+              )}
               <input
                 autoFocus
                 value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
+                onChange={(e) => {
+                  setNameInput(e.target.value);
+                  setNameError('');
+                }}
                 onKeyDown={handleNameKeyDown}
                 placeholder="Your name..."
                 maxLength={30}
@@ -226,8 +302,8 @@ export default function ChatWidget() {
                 }}
               />
               <button
-                onClick={handleSetUsername}
-                disabled={!nameInput.trim()}
+                onClick={() => void handleSetUsername()}
+                disabled={!canSaveName}
                 style={{
                   width: '100%',
                   borderRadius: '999px',
@@ -235,13 +311,36 @@ export default function ChatWidget() {
                   fontSize: '14px',
                   fontWeight: 600,
                   color: '#ffffff',
-                  backgroundColor: nameInput.trim() ? '#1E3A5F' : '#9CA3AF',
+                  backgroundColor: canSaveName ? '#1E3A5F' : '#9CA3AF',
                   border: 'none',
-                  cursor: nameInput.trim() ? 'pointer' : 'not-allowed',
+                  cursor: canSaveName ? 'pointer' : 'not-allowed',
                 }}
               >
-                Start Chatting
+                {isSavingName ? 'Saving...' : isRenaming ? 'Save Name' : 'Start Chatting'}
               </button>
+              {nameInput.length > 0 && !nameValid && (
+                <p style={{ fontSize: '11px', color: '#EF4444', textAlign: 'center', margin: '-8px 0 0' }}>
+                  Name must contain 2 to 30 characters.
+                </p>
+              )}
+              {nameError && (
+                <p style={{ fontSize: '11px', color: '#EF4444', textAlign: 'center', margin: '-8px 0 0' }}>
+                  {nameError}
+                </p>
+              )}
+              {isRenaming && (
+                <button
+                  onClick={() => {
+                    setIsRenaming(false);
+                    setNameInput('');
+                    setNameError('');
+                  }}
+                  disabled={isSavingName}
+                  style={{ fontSize: '12px', color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -327,7 +426,8 @@ export default function ChatWidget() {
                     Chatting as <span style={{ fontWeight: 600, color: '#1E3A5F' }}>{username}</span>
                   </span>
                   <button
-                    onClick={() => { localStorage.removeItem(STORAGE_KEY); setUsername(''); }}
+                    onClick={() => void handleBeginRename()}
+                    disabled={isSavingName}
                     style={{ fontSize: '11px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
                     Change
