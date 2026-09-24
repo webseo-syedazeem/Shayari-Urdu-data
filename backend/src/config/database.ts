@@ -20,7 +20,22 @@ if (!supabaseUrl) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
+  auth: { autoRefreshToken: false, persistSession: false },
+  realtime: {
+    // A backend process can sit idle for long periods. Use an explicit heartbeat
+    // shorter than common proxy idle timeouts and allow slow channel joins enough
+    // time before Realtime reports TIMED_OUT.
+    heartbeatIntervalMs: 15_000,
+    timeout: 30_000,
+    reconnectAfterMs: (attempt: number) => (
+      Math.min(1_000 * (2 ** Math.min(attempt, 5)), 30_000)
+    ),
+    heartbeatCallback: (status) => {
+      if (status === 'error' || status === 'timeout' || status === 'disconnected') {
+        console.warn('[chat-push] Supabase Realtime heartbeat status', { status });
+      }
+    }
+  }
 });
 
 export { supabaseUrl, supabaseKey };

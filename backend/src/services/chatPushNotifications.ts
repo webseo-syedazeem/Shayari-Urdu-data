@@ -10,7 +10,9 @@ const RECEIPT_CHECK_INTERVAL_MS = 15 * 60_000;
 const RECEIPT_DELAY_MS = 15 * 60_000;
 const MAX_RECEIPT_AGE_MS = 24 * 60 * 60_000;
 const MESSAGE_PREVIEW_LENGTH = 120;
-const MAX_RECONNECT_DELAY_MS = 60_000;
+const REALTIME_RECOVERY_GRACE_MS = 45_000;
+const REALTIME_CLOSED_REBUILD_DELAY_MS = 1_000;
+const MAX_PROCESSED_MESSAGE_IDS = 10_000;
 const EXPO_REQUEST_TIMEOUT_MS = 15_000;
 const EXPO_TOKEN_PATTERN = /^(Expo|Exponent)PushToken\[[^\]]+\]$/;
 
@@ -46,12 +48,14 @@ type ExpoReceipt = {
 type StopChatPushNotifications = () => Promise<void>;
 
 let channel: RealtimeChannel | null = null;
-let reconnectTimer: NodeJS.Timeout | null = null;
+let channelRebuildTimer: NodeJS.Timeout | null = null;
+let channelOperation: Promise<void> | null = null;
 let receiptTimer: NodeJS.Timeout | null = null;
-let reconnectAttempt = 0;
+let channelGeneration = 0;
 let receiptCheckRunning = false;
 let started = false;
 let stopping = false;
+const processedMessageIds = new Set<string>();
 
 function chunks<T>(values: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -70,6 +74,17 @@ function messagePreview(message: string): string {
 function tokenPreview(token: string): string {
   if (token.length <= 18) return token;
   return `${token.slice(0, 14)}...${token.slice(-6)}`;
+}
+
+function rememberMessageId(messageId: string): boolean {
+  if (processedMessageIds.has(messageId)) return false;
+
+  processedMessageIds.add(messageId);
+  if (processedMessageIds.size > MAX_PROCESSED_MESSAGE_IDS) {
+    const oldestMessageId = processedMessageIds.values().next().value;
+    if (oldestMessageId) processedMessageIds.delete(oldestMessageId);
+  }
+  return true;
 }
 
 async function removeTokens(tokens: string[]): Promise<number> {
@@ -321,93 +336,171 @@ async function handleChatInsert(record: ChatMessageRecord): Promise<void> {
     return;
   }
 
-  const result = await sendChatPushes(sender, message, messageId);
-  console.log(
-    `[chat-push] Message ${messageId ?? 'unknown'}: recipients=${result.recipients} sent=${result.sent} removed=${result.removed}`
-  );
+  if (messageId && !rememberMessageId(messageId)) {
+    console.warn('[chat-push] Duplicate chat INSERT ignored', { messageId });
+    return;
+  }
+
+  try {
+    const result = await sendChatPushes(sender, message, messageId);
+    console.log(
+      `[chat-push] Message ${messageId ?? 'unknown'}: recipients=${result.recipients} sent=${result.sent} removed=${result.removed}`
+    );
+  } catch (error) {
+    // If processing failed before a definitive result, permit a later duplicate
+    // event to retry instead of permanently losing the notification.
+    if (messageId) processedMessageIds.delete(messageId);
+    throw error;
+  }
 }
 
-function clearReconnectTimer(): void {
-  if (!reconnectTimer) return;
-  clearTimeout(reconnectTimer);
-  reconnectTimer = null;
+function clearChannelRebuildTimer(): void {
+  if (!channelRebuildTimer) return;
+  clearTimeout(channelRebuildTimer);
+  channelRebuildTimer = null;
 }
 
-function scheduleReconnect(reason: string, error?: Error): void {
-  if (stopping || reconnectTimer) return;
+async function removeRealtimeChannel(
+  targetChannel: RealtimeChannel,
+  reason: string
+): Promise<void> {
+  if (channel === targetChannel) channel = null;
 
-  const delay = Math.min(1_000 * (2 ** reconnectAttempt), MAX_RECONNECT_DELAY_MS);
-  reconnectAttempt += 1;
-  console.warn(
-    `[chat-push] Realtime ${reason}; reconnecting in ${delay}ms${error ? `: ${error.message}` : ''}`
-  );
+  let result = await supabase.removeChannel(targetChannel);
+  if (result === 'error') {
+    // removeChannel delegates to unsubscribe. If the server rejects the leave,
+    // force local timer/binding teardown, then retry while disconnected so the
+    // client also removes the channel from its internal channel collection.
+    targetChannel.teardown();
+    result = await supabase.removeChannel(targetChannel);
+  }
 
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    void connectRealtime().catch((connectError) => {
-      console.error('[chat-push] Realtime reconnect failed', connectError);
-      scheduleReconnect('connect failed');
+  console.log('[chat-push] Realtime channel removed', {
+    reason,
+    result,
+    activeChannels: supabase.getChannels().length
+  });
+}
+
+function scheduleChannelRebuild(reason: string, delay: number): void {
+  if (stopping) return;
+  if (channelRebuildTimer) {
+    console.log('[chat-push] Realtime channel rebuild already scheduled', { reason });
+    return;
+  }
+
+  console.warn(`[chat-push] Realtime ${reason}; channel rebuild watchdog in ${delay}ms`);
+  channelRebuildTimer = setTimeout(() => {
+    channelRebuildTimer = null;
+    void replaceRealtimeChannel(`watchdog after ${reason}`).catch((error) => {
+      console.error('[chat-push] Realtime channel rebuild failed', error);
+      scheduleChannelRebuild('rebuild failed', REALTIME_RECOVERY_GRACE_MS);
     });
   }, delay);
-  reconnectTimer.unref();
+  channelRebuildTimer.unref();
 }
 
-async function connectRealtime(): Promise<void> {
+async function replaceRealtimeChannel(reason: string): Promise<void> {
   if (stopping) return;
+  if (channelOperation) {
+    console.log('[chat-push] Realtime channel operation already in progress', { reason });
+    await channelOperation;
+    return;
+  }
 
-  const previousChannel = channel;
-  channel = null;
-  if (previousChannel) await supabase.removeChannel(previousChannel);
-  if (stopping) return;
+  const operation = (async () => {
+    clearChannelRebuildTimer();
 
-  const nextChannel = supabase
-    .channel(`backend_chat_push_${Date.now()}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-      (payload) => {
-        void handleChatInsert(payload.new as ChatMessageRecord).catch((error) => {
-          console.error('[chat-push] Failed to handle chat INSERT', error);
-        });
-      }
-    );
+    const previousChannel = channel;
+    if (previousChannel) {
+      await removeRealtimeChannel(previousChannel, `replace: ${reason}`);
+    }
+    if (stopping) return;
 
-  channel = nextChannel;
-  nextChannel.subscribe((status, error) => {
-    if (stopping || channel !== nextChannel) return;
+    const generation = channelGeneration + 1;
+    channelGeneration = generation;
+    const nextChannel = supabase
+      .channel('backend_chat_push')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          void handleChatInsert(payload.new as ChatMessageRecord).catch((error) => {
+            console.error('[chat-push] Failed to handle chat INSERT', error);
+          });
+        }
+      );
 
-    console.log('[chat-push] Realtime subscription status', {
-      status,
-      error: error?.message ?? null
+    channel = nextChannel;
+    console.log('[chat-push] Realtime channel created', {
+      generation,
+      reason,
+      activeChannels: supabase.getChannels().length
     });
 
-    if (status === 'SUBSCRIBED') {
-      clearReconnectTimer();
-      reconnectAttempt = 0;
-      console.log('[chat-push] Listening for chat_messages INSERT events');
-      return;
-    }
+    nextChannel.subscribe((status, error) => {
+      if (
+        stopping
+        || channel !== nextChannel
+        || channelGeneration !== generation
+      ) {
+        return;
+      }
 
-    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-      scheduleReconnect(status.toLowerCase(), error);
-    }
-  });
+      console.log('[chat-push] Realtime subscription status', {
+        generation,
+        status,
+        error: error ?? null
+      });
+
+      if (status === 'SUBSCRIBED') {
+        clearChannelRebuildTimer();
+        console.log('[chat-push] Listening for chat_messages INSERT events', {
+          generation,
+          activeChannels: supabase.getChannels().length
+        });
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        // RealtimeChannel already schedules a rejoin for these transient states.
+        // Give that built-in recovery a chance instead of racing it by creating
+        // a new channel. The watchdog replaces it only if it never resubscribes.
+        scheduleChannelRebuild(status.toLowerCase(), REALTIME_RECOVERY_GRACE_MS);
+      } else if (status === 'CLOSED') {
+        scheduleChannelRebuild(status.toLowerCase(), REALTIME_CLOSED_REBUILD_DELAY_MS);
+      }
+    });
+  })();
+
+  channelOperation = operation;
+  try {
+    await operation;
+  } finally {
+    if (channelOperation === operation) channelOperation = null;
+  }
 }
 
 async function stopChatPushNotifications(): Promise<void> {
   if (!started) return;
   stopping = true;
   started = false;
-  clearReconnectTimer();
+  clearChannelRebuildTimer();
 
   if (receiptTimer) {
     clearInterval(receiptTimer);
     receiptTimer = null;
   }
 
+  if (channelOperation) {
+    await channelOperation.catch((error) => {
+      console.error('[chat-push] Realtime operation failed during shutdown', error);
+    });
+  }
+
   const activeChannel = channel;
-  channel = null;
-  if (activeChannel) await supabase.removeChannel(activeChannel);
+  if (activeChannel) await removeRealtimeChannel(activeChannel, 'worker shutdown');
+  processedMessageIds.clear();
   console.log('[chat-push] Worker stopped');
 }
 
@@ -424,11 +517,10 @@ export function startChatPushNotifications(): StopChatPushNotifications {
 
   started = true;
   stopping = false;
-  reconnectAttempt = 0;
 
-  void connectRealtime().catch((error) => {
+  void replaceRealtimeChannel('worker start').catch((error) => {
     console.error('[chat-push] Initial Realtime connection failed', error);
-    scheduleReconnect('initial connect failed');
+    scheduleChannelRebuild('initial connect failed', REALTIME_RECOVERY_GRACE_MS);
   });
 
   void runReceiptCheck();
