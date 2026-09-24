@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { supabase } from '../lib/supabase';
+import { getChatUserId } from '../lib/chatUserId';
 import type { ChatMessage } from '../hooks/useChat';
 
 const SOUND_KEY = 'soundNotificationsEnabled';
@@ -47,6 +48,7 @@ function truncate(text: string, max = 56): string {
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
+  const [chatUserId] = useState(getChatUserId);
   const [soundEnabled, setSoundEnabledState] = useState(() => readBooleanPref(SOUND_KEY));
   const [popupEnabled, setPopupEnabledState] = useState(() => readBooleanPref(POPUP_KEY));
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -130,8 +132,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           const myUsername = localStorage.getItem(USERNAME_KEY);
+          const isOwnMessage = newMsg.user_id
+            ? newMsg.user_id === chatUserId
+            : Boolean(myUsername && newMsg.username === myUsername);
 
-          if (myUsername && newMsg.username === myUsername) return;
+          if (isOwnMessage) return;
 
           const wantsPopup = readBooleanPref(POPUP_KEY);
           const wantsSound = readBooleanPref(SOUND_KEY);
@@ -156,7 +161,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => {
       channel.unsubscribe();
     };
-  }, [dismissToast, playSound]);
+  }, [chatUserId, dismissToast, playSound]);
 
   return (
     <NotificationContext.Provider

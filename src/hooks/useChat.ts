@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 export interface ChatMessage {
   id?: string;
+  user_id?: string | null;
   username: string;
   message: string;
   room?: string;
@@ -18,7 +19,7 @@ interface UseChatReturn {
   isConnected: boolean;
 }
 
-export function useChat(username?: string): UseChatReturn {
+export function useChat(username: string | undefined, userId: string): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [onlineCount, setOnlineCount] = useState(1);
   const [isConnected, setIsConnected] = useState(false);
@@ -33,7 +34,7 @@ export function useChat(username?: string): UseChatReturn {
     async function fetchHistory() {
       const { data } = await supabase
         .from('chat_messages')
-        .select('id, username, message, room, created_at')
+        .select('id, user_id, username, message, room, created_at')
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -111,7 +112,7 @@ export function useChat(username?: string): UseChatReturn {
   const sendMessage = async (msgUsername: string, message: string) => {
     const { error } = await supabase
       .from('chat_messages')
-      .insert({ username: msgUsername, message, room: 'general' });
+      .insert({ user_id: userId, username: msgUsername, message, room: 'general' });
 
     if (error) {
       throw new Error(error.message);

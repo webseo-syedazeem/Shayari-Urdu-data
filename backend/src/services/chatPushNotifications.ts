@@ -18,6 +18,7 @@ const EXPO_TOKEN_PATTERN = /^(Expo|Exponent)PushToken\[[^\]]+\]$/;
 
 type ChatMessageRecord = {
   id?: unknown;
+  user_id?: unknown;
   username?: unknown;
   message?: unknown;
   user_name?: unknown;
@@ -100,18 +101,22 @@ async function removeTokens(tokens: string[]): Promise<number> {
   return uniqueTokens.length;
 }
 
-async function loadRecipientTokens(sender: string): Promise<string[]> {
+async function loadRecipientTokens(sender: string, senderUserId?: string): Promise<string[]> {
   const tokens: string[] = [];
   const pageSize = 1_000;
 
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('push_tokens')
       .select('expo_push_token')
       .eq('push_enabled', true)
-      .neq('chat_username', sender)
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1);
+    query = senderUserId
+      ? query.neq('installation_id', senderUserId)
+      : query.neq('chat_username', sender);
+
+    const { data, error } = await query;
 
     if (error) throw error;
     const page = (data ?? []) as PushTokenRow[];
@@ -131,6 +136,7 @@ async function loadRecipientTokens(sender: string): Promise<string[]> {
   const validTokens = uniqueTokens.filter((token) => EXPO_TOKEN_PATTERN.test(token));
   console.log('[chat-push] Recipient query complete', {
     sender,
+    senderUserId: senderUserId ?? null,
     enabledUniqueTokens: uniqueTokens.length,
     validRecipientTokens: validTokens.length
   });
@@ -140,9 +146,10 @@ async function loadRecipientTokens(sender: string): Promise<string[]> {
 async function sendChatPushes(
   sender: string,
   message: string,
-  messageId?: string
+  messageId?: string,
+  senderUserId?: string
 ): Promise<{ recipients: number; sent: number; removed: number }> {
-  const tokens = await loadRecipientTokens(sender);
+  const tokens = await loadRecipientTokens(sender, senderUserId);
   let sent = 0;
   let removed = 0;
 
@@ -324,10 +331,14 @@ async function handleChatInsert(record: ChatMessageRecord): Promise<void> {
   const sender = String(record.username ?? record.user_name ?? '').trim();
   const message = String(record.message ?? record.message_text ?? '').trim();
   const messageId = typeof record.id === 'string' ? record.id : undefined;
+  const senderUserId = typeof record.user_id === 'string' && record.user_id.trim()
+    ? record.user_id.trim()
+    : undefined;
 
   console.log('[chat-push] chat_messages INSERT received', {
     messageId: messageId ?? null,
     sender: sender || null,
+    senderUserId: senderUserId ?? null,
     messageLength: message.length
   });
 
@@ -342,7 +353,7 @@ async function handleChatInsert(record: ChatMessageRecord): Promise<void> {
   }
 
   try {
-    const result = await sendChatPushes(sender, message, messageId);
+    const result = await sendChatPushes(sender, message, messageId, senderUserId);
     console.log(
       `[chat-push] Message ${messageId ?? 'unknown'}: recipients=${result.recipients} sent=${result.sent} removed=${result.removed}`
     );

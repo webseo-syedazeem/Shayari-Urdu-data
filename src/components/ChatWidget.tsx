@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Settings, Volume2, VolumeX, Bell, BellOff } from 'lucide-react';
 import { useChat, ChatMessage } from '../hooks/useChat';
 import { useNotifications, OPEN_CHAT_EVENT } from '../contexts/NotificationContext';
+import { getChatUserId } from '../lib/chatUserId';
 
 const STORAGE_KEY = 'chat_username';
 
@@ -11,6 +12,7 @@ function formatTime(iso: string): string {
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const [userId] = useState(getChatUserId);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [username, setUsername] = useState<string>(() => localStorage.getItem(STORAGE_KEY) ?? '');
   const [nameInput, setNameInput] = useState('');
@@ -19,7 +21,10 @@ export default function ChatWidget() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState(false);
 
-  const { isConnected, messages, sendMessage, onlineCount } = useChat(username || undefined);
+  const { isConnected, messages, sendMessage, onlineCount } = useChat(
+    username || undefined,
+    userId,
+  );
   const { soundEnabled, popupEnabled, setSoundEnabled, setPopupEnabled } = useNotifications();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
@@ -259,7 +264,9 @@ export default function ChatWidget() {
                   </div>
                 ) : (
                   messages.map((msg: ChatMessage, i: number) => {
-                    const isSelf = msg.username === username;
+                    const isSelf = msg.user_id
+                      ? msg.user_id === userId
+                      : msg.username === username;
                     const time = msg.time ?? msg.created_at ?? '';
                     return (
                       <div
