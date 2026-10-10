@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, X, Upload, Image as ImageIcon } from 'lucide-react';
-import { api } from '../../services/api';
+import { Plus, Edit, Trash2, X, Upload, Sparkles, Loader2 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { uploadImage } from '../../services/uploadService';
+import { generatePoetImage } from '../../services/imageGenerationService';
 import SeoSettingsSection from '../../components/admin/SeoSettingsSection';
 
 interface PoetFormData {
@@ -20,8 +20,17 @@ interface PoetFormData {
   seo_keywords: string;
 }
 
+type PoetRecord = Partial<PoetFormData> & {
+  id: string;
+  name: string;
+};
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export default function ManagePoetsPage() {
-  const [poets, setPoets] = useState<any[]>([]);
+  const [poets, setPoets] = useState<PoetRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,6 +53,8 @@ export default function ManagePoetsPage() {
   const [success, setSuccess] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   useEffect(() => {
     loadPoets();
@@ -52,7 +63,7 @@ export default function ManagePoetsPage() {
   const loadPoets = async () => {
     try {
       setLoading(true);
-      const data = await adminApi.get('/poets');
+      const data = await adminApi.get<PoetRecord[]>('/poets');
       setPoets(data);
     } catch (error) {
       console.error('Error loading poets:', error);
@@ -97,12 +108,14 @@ export default function ManagePoetsPage() {
     });
     setSelectedFile(null);
     setPreviewUrl('');
+    setImagePrompt('');
+    setGeneratingImage(false);
     setShowForm(true);
     setError('');
     setSuccess('');
   };
 
-  const handleEdit = (poet: any) => {
+  const handleEdit = (poet: PoetRecord) => {
     setEditingId(poet.id);
     setFormData({
       name: poet.name || '',
@@ -120,6 +133,8 @@ export default function ManagePoetsPage() {
     });
     setSelectedFile(null);
     setPreviewUrl(poet.avatar_url || '');
+    setImagePrompt('');
+    setGeneratingImage(false);
     setShowForm(true);
     setError('');
     setSuccess('');
@@ -140,6 +155,37 @@ export default function ManagePoetsPage() {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setError('');
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!editingId) {
+      setError('Create the poet first. The image will then generate automatically from this prompt.');
+      return;
+    }
+    if (!imagePrompt.trim()) {
+      setError('Please enter an image prompt.');
+      return;
+    }
+
+    setGeneratingImage(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await generatePoetImage(editingId, imagePrompt);
+      setFormData((current) => ({ ...current, avatar_url: result.public_url }));
+      setSelectedFile(null);
+      setPreviewUrl(result.public_url);
+      setPoets((items) => items.map((poet) => (
+        poet.id === editingId ? { ...poet, avatar_url: result.public_url } : poet
+      )));
+      setSuccess(
+        `Portrait generated and saved using ${result.model} (${result.quality}, ${result.image_format.toUpperCase()}, settings: ${result.settings_source}).`
+      );
+    } catch (generationError: unknown) {
+      setError(errorMessage(generationError, 'Failed to generate poet image.'));
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -188,25 +234,50 @@ export default function ManagePoetsPage() {
         await adminApi.put(`/poets/${editingId}`, payload);
         setSuccess('Poet updated successfully');
       } else {
-        const created = await adminApi.post('/poets', payload);
+        const created = await adminApi.post<{ id: string }>('/poets', payload);
         poetId = created.id;
+        const prompt = imagePrompt.trim();
 
-        if (selectedFile && poetId) {
+        if (selectedFile && poetId && !prompt) {
           const uploadResult = await uploadImage(selectedFile, 'poets', poetId);
           if (uploadResult.success && uploadResult.publicUrl) {
             await adminApi.put(`/poets/${poetId}`, { avatar_url: uploadResult.publicUrl });
           }
         }
-        setSuccess('Poet created successfully');
+
+        if (prompt && poetId) {
+          setGeneratingImage(true);
+          try {
+            const result = await generatePoetImage(poetId, prompt);
+            avatarUrl = result.public_url;
+            setFormData((current) => ({ ...current, avatar_url: avatarUrl }));
+            setSelectedFile(null);
+            setPreviewUrl(avatarUrl);
+            setSuccess('Poet created and portrait generated successfully');
+          } catch (generationError: unknown) {
+            setEditingId(poetId);
+            setError(
+              `Poet was created, but its portrait could not be generated: ${errorMessage(generationError, 'Unknown error')}`
+            );
+            await loadPoets();
+            return;
+          } finally {
+            setGeneratingImage(false);
+          }
+        } else {
+          setSuccess('Poet created successfully');
+        }
       }
 
       setShowForm(false);
       setSelectedFile(null);
       setPreviewUrl('');
+      setImagePrompt('');
+      setGeneratingImage(false);
       loadPoets();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Admin save poet error:', error);
-      setError(error.message || 'Failed to save poet');
+      setError(errorMessage(error, 'Failed to save poet'));
     } finally {
       setSubmitting(false);
     }
@@ -221,9 +292,9 @@ export default function ManagePoetsPage() {
       await adminApi.delete(`/poets/${id}`);
       setSuccess('Poet deleted successfully');
       loadPoets();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting poet:', error);
-      setError(error.message || 'Failed to delete poet');
+      setError(errorMessage(error, 'Failed to delete poet'));
     }
   };
 
@@ -268,6 +339,17 @@ export default function ManagePoetsPage() {
                   <X size={24} />
                 </button>
               </div>
+
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                  {success}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -360,6 +442,48 @@ export default function ManagePoetsPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
                       placeholder="https://example.com/avatar.jpg"
                     />
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          AI Portrait Prompt
+                        </label>
+                        <textarea
+                          value={imagePrompt}
+                          onChange={(event) => setImagePrompt(event.target.value)}
+                          rows={4}
+                          maxLength={4000}
+                          disabled={generatingImage || submitting}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 disabled:bg-gray-100"
+                          placeholder="Describe the portrait to generate for this poet..."
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-gray-500">
+                          {editingId
+                            ? 'The generated portrait will be uploaded and saved to this poet immediately.'
+                            : 'The portrait will generate automatically after the poet is created. A prompt takes priority over a selected upload.'}
+                        </p>
+                        {editingId ? (
+                          <button
+                            type="button"
+                            onClick={handleGenerateImage}
+                            disabled={generatingImage || submitting || !imagePrompt.trim()}
+                            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {generatingImage ? (
+                              <Loader2 className="animate-spin" size={18} />
+                            ) : (
+                              <Sparkles size={18} />
+                            )}
+                            <span>{generatingImage ? 'Generating...' : 'Generate Portrait'}</span>
+                          </button>
+                        ) : (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                            Runs after Create
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -443,10 +567,16 @@ export default function ManagePoetsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
+                    disabled={submitting || generatingImage}
                     className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                   >
-                    {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
+                    {submitting
+                      ? (generatingImage ? 'Generating portrait...' : 'Saving...')
+                      : editingId
+                        ? 'Update'
+                        : imagePrompt.trim()
+                          ? 'Create & Generate Portrait'
+                          : 'Create'}
                   </button>
                 </div>
               </form>

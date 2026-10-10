@@ -294,13 +294,29 @@ router.get('/by-slug', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const cacheKey = buildKey('shayari', 'item', req.params.id);
-    const { value: shayari, hit } = await cacheAside<CachedRecord | null>(cacheKey, ITEM_TTL, async () => {
-      const fresh = await getShayariDetail('id', req.params.id);
-      if (fresh?.slug) void cacheSet(buildKey('shayari', 'slug', fresh.slug), fresh, ITEM_TTL);
-      return fresh;
-    });
+    const forceFresh = req.query.fresh === '1' || req.query.fresh === 'true';
+    const dirtyIds = forceFresh ? await getDirtyIds('shayari') : [];
+    const refreshFromDatabase = forceFresh && !dirtyIds.includes(req.params.id);
+    let shayari: CachedRecord | null;
+    let hit = false;
 
-    res.set('X-Cache', hit ? 'HIT' : 'MISS');
+    if (refreshFromDatabase) {
+      shayari = await getShayariDetail('id', req.params.id);
+      if (shayari) {
+        await cacheSet(cacheKey, shayari, ITEM_TTL);
+        if (shayari.slug) await cacheSet(buildKey('shayari', 'slug', shayari.slug), shayari, ITEM_TTL);
+      }
+    } else {
+      const cached = await cacheAside<CachedRecord | null>(cacheKey, ITEM_TTL, async () => {
+        const fresh = await getShayariDetail('id', req.params.id);
+        if (fresh?.slug) void cacheSet(buildKey('shayari', 'slug', fresh.slug), fresh, ITEM_TTL);
+        return fresh;
+      });
+      shayari = cached.value;
+      hit = cached.hit;
+    }
+
+    res.set('X-Cache', refreshFromDatabase ? 'REFRESH' : hit ? 'HIT' : 'MISS');
     if (!shayari || shayari._deleted) return res.status(404).json({ error: 'Shayari not found' });
     res.json(publicValue(shayari));
   } catch (error) {
@@ -308,7 +324,6 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch shayari' });
   }
 });
-
 router.get('/:id/chat', async (req, res) => {
   try {
     const { page = '1', pageSize = '50' } = req.query;

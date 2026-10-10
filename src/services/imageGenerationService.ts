@@ -11,8 +11,12 @@ export interface GeneratedShayariImage {
   settings_source: 'database' | 'environment';
 }
 
-export async function generateShayariImage(
-  shayariId: string,
+type ImageGenerationTarget =
+  | { shayari_id: string; poet_id?: never }
+  | { poet_id: string; shayari_id?: never };
+
+async function generateEntityImage(
+  target: ImageGenerationTarget,
   prompt: string
 ): Promise<GeneratedShayariImage> {
   const token = localStorage.getItem('adminAccessToken')?.trim();
@@ -24,7 +28,7 @@ export async function generateShayariImage(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ shayari_id: shayariId, prompt: prompt.trim() })
+    body: JSON.stringify({ ...target, prompt: prompt.trim() })
   });
 
   if (!response.ok) {
@@ -33,4 +37,18 @@ export async function generateShayariImage(
   }
 
   return response.json();
+}
+
+export function generateShayariImage(
+  shayariId: string,
+  prompt: string
+): Promise<GeneratedShayariImage> {
+  return generateEntityImage({ shayari_id: shayariId }, prompt);
+}
+
+export function generatePoetImage(
+  poetId: string,
+  prompt: string
+): Promise<GeneratedShayariImage> {
+  return generateEntityImage({ poet_id: poetId }, prompt);
 }

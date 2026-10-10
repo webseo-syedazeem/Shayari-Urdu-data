@@ -49,7 +49,7 @@ export const adminApi = {
     if (endpoint.startsWith('/shayari')) {
       const parts = endpoint.split('/').filter(Boolean);
       if (parts.length === 2) {
-        const data = await adminFetch<any>(`/api/shayari/${parts[1]}`);
+        const data = await adminFetch<any>(`/api/shayari/${parts[1]}?fresh=1`, { cache: 'no-store' });
         const topic_ids = (data.topics || []).map((t: any) => t.id).filter(Boolean);
         const tag_ids = (data.tags || []).map((t: any) => t.id).filter(Boolean);
         return { ...data, topic_ids, tag_ids } as T;
